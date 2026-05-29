@@ -42,7 +42,6 @@ jobs:
           test -n "${{ secrets.DEPLOY_SSH_KEY }}"
           test -n "${{ secrets.DEPLOY_TARGET_DIR }}"
           test -n "${{ secrets.APP_DOMAIN }}"
-          test -n "${{ secrets.LETSENCRYPT_EMAIL }}"
           test -n "${{ secrets.OPENAI_BASE_URL }}"
           test -n "${{ secrets.OPENAI_API_KEY }}"
           test -n "${{ secrets.OPENAI_TEXT_MODEL }}"

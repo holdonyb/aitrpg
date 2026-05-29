@@ -35,7 +35,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://127.0.0.1:4000/api/;
+        proxy_pass http://127.0.0.1:__API_HOST_PORT__/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -46,7 +46,7 @@ server {
     }
 
     location /socket.io/ {
-        proxy_pass http://127.0.0.1:4000/socket.io/;
+        proxy_pass http://127.0.0.1:__API_HOST_PORT__/socket.io/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -57,7 +57,7 @@ server {
     }
 
     location / {
-        proxy_pass http://127.0.0.1:3000/;
+        proxy_pass http://127.0.0.1:__WEB_HOST_PORT__/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -74,4 +74,3 @@ server {
         add_header Content-Type text/plain;
     }
 }
-
