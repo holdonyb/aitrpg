@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String     @id @default(uuid())
+  email       String     @unique
+  displayName String
+  campaigns   Campaign[]
+}
+
+model Campaign {
+  id            String      @id @default(uuid())
+  ownerId       String
+  owner         User        @relation(fields: [ownerId], references: [id])
+  title         String
+  pitch         String
+  worldTemplate String
+  tone          String
+  rooms         Room[]
+  characters    Character[]
+  createdAt     DateTime    @default(now())
+}
+
+model Character {
+  id           String   @id @default(uuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id])
+  name         String
+  ancestry     String
+  className    String
+  background   String
+  personality  String
+  controlledBy String
+}
+
+model Room {
+  id          String       @id @default(uuid())
+  campaignId  String
+  campaign    Campaign     @relation(fields: [campaignId], references: [id])
+  title       String
+  description String
+  status      String
+  createdBy   String
+  events      StoryEvent[]
+  mediaJobs   MediaJob[]
+  createdAt   DateTime     @default(now())
+}
+
+model StoryEvent {
+  id          String   @id @default(uuid())
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  characterId String?
+  type        String
+  content     String
+  createdAt   DateTime @default(now())
+}
+
+model MediaJob {
+  id        String   @id @default(uuid())
+  roomId     String
+  room       Room     @relation(fields: [roomId], references: [id])
+  type       String
+  title      String
+  prompt     String
+  status     String
+  createdAt  DateTime @default(now())
+}

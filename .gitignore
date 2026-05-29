@@ -1,0 +1,17 @@
+.next
+dist
+coverage
+node_modules
+.pnpm-store
+.runtime
+.turbo
+*.log
+.env
+.env.local
+.env.production
+apps/*/.next
+apps/*/node_modules
+packages/*/node_modules
+apps/api/prisma/migrations
+apps/api/prisma/dev.db
+

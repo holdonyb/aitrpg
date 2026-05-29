@@ -1,0 +1,54 @@
+# ATRPG
+
+ATRPG is a web-based AI tabletop RPG platform for real-time text sessions with a human DM, human players, and AI-controlled party members or NPCs.
+
+## Stack
+
+- Frontend: Next.js + TypeScript
+- Backend: NestJS + TypeScript
+- Shared types: workspace package with Zod schemas
+- Database: PostgreSQL + Prisma
+- Queue: Redis + BullMQ
+- Deployment: Docker Compose
+
+## Workspace
+
+- `apps/web`: player and DM web app
+- `apps/api`: HTTP, WebSocket, auth, orchestration, jobs
+- `packages/shared`: shared schemas and DTO contracts
+- `docs`: PRD, system design, UI prototype
+- `infra`: Docker Compose and deployment assets
+
+## Commands
+
+```bash
+pnpm install
+pnpm --filter @atrpg/shared build
+pnpm --filter api test
+pnpm --filter web lint
+pnpm --filter api start:dev
+pnpm --filter web dev
+```
+
+## Local URLs
+
+- Web: `http://localhost:3000`
+- API: `http://localhost:4000/api/system`
+- Mailpit: `http://localhost:8025`
+- MinIO Console: `http://localhost:9001`
+
+## Docker Compose
+
+```bash
+docker compose -f infra/docker-compose.yml up --build
+```
+
+## Current Status
+
+The repository currently contains the first implementation slice:
+
+- product and architecture docs
+- workspace scaffolding
+- shared domain schemas
+- API foundation for auth, campaigns, characters, rooms, ledger, and media jobs
+- web foundation for key product surfaces
