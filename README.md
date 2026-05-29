@@ -61,7 +61,7 @@ Required repository secrets for deployment:
 - `DEPLOY_SSH_KEY`
 - `DEPLOY_TARGET_DIR`
 - `APP_DOMAIN`
-- `LETSENCRYPT_EMAIL`
+- `LETSENCRYPT_EMAIL` if the target host does not already have a usable certbot account
 - `OPENAI_BASE_URL`
 - `OPENAI_API_KEY`
 - `OPENAI_TEXT_MODEL`
@@ -72,9 +72,9 @@ Required repository secrets for deployment:
 Production deploy behavior:
 
 - `nginx` terminates HTTPS on the host
-- `certbot` issues and renews the certificate using webroot mode
-- `web` listens on `127.0.0.1:3000`
-- `api` listens on `127.0.0.1:4000`
+- `certbot` issues and renews the certificate using webroot mode, or reuses an existing host account
+- `web` listens on `127.0.0.1:${WEB_HOST_PORT}` and defaults to `127.0.0.1:13100` in production
+- `api` listens on `127.0.0.1:${API_HOST_PORT}` and defaults to `127.0.0.1:4000`
 - `nginx` proxies `/` to web and `/api/` to api
 
 ## Current Status
