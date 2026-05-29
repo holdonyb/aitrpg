@@ -41,6 +41,8 @@ jobs:
           test -n "${{ secrets.DEPLOY_USER }}"
           test -n "${{ secrets.DEPLOY_SSH_KEY }}"
           test -n "${{ secrets.DEPLOY_TARGET_DIR }}"
+          test -n "${{ secrets.APP_DOMAIN }}"
+          test -n "${{ secrets.LETSENCRYPT_EMAIL }}"
 
       - name: Install SSH key
         run: |
@@ -56,9 +58,13 @@ jobs:
             --exclude "node_modules" \
             ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_TARGET_DIR }}/"
 
-      - name: Remote compose deploy
+      - name: Remote deploy
         run: |
           ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" <<'EOF'
+          export DEPLOY_TARGET_DIR="${{ secrets.DEPLOY_TARGET_DIR }}"
+          export APP_DOMAIN="${{ secrets.APP_DOMAIN }}"
+          export LETSENCRYPT_EMAIL="${{ secrets.LETSENCRYPT_EMAIL }}"
           cd "${{ secrets.DEPLOY_TARGET_DIR }}"
-          docker compose -f infra/docker-compose.yml up --build -d
+          chmod +x infra/scripts/remote-deploy.sh
+          ./infra/scripts/remote-deploy.sh
           EOF
