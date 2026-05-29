@@ -52,7 +52,7 @@ services:
     environment:
       PORT: 4000
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,11 +68,10 @@ services:
     environment:
       PORT: 3000
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - api
 
 volumes:
   postgres_data:
   minio_data:
-

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (typeof window === "undefined" ? "http://localhost:4000/api" : "/api");
 
 type SystemStatus = {
   product: string;
