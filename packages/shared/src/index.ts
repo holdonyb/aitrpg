@@ -27,6 +27,9 @@ export const roomStatusSchema = z.enum([
   "ENDED",
 ]);
 
+export const roomVisibilitySchema = z.enum(["PRIVATE", "LINK", "PUBLIC"]);
+export const shareTargetTypeSchema = z.enum(["ROOM", "ARTIFACT"]);
+
 export const storyEventTypeSchema = z.enum([
   "speech",
   "narration",
@@ -72,6 +75,9 @@ export const roomInputSchema = z.object({
   campaignId: z.string().uuid(),
   title: z.string().min(2).max(80),
   description: z.string().min(10).max(400),
+  visibility: roomVisibilitySchema.default("PRIVATE"),
+  password: z.string().min(4).max(64).optional(),
+  spectatorCommentEnabled: z.boolean().default(false),
 });
 
 export const roomJoinInputSchema = z.object({
@@ -95,6 +101,18 @@ export const mediaJobInputSchema = z.object({
   prompt: z.string().min(4).max(4000),
 });
 
+export const shareLinkInputSchema = z.object({
+  targetType: shareTargetTypeSchema.default("ROOM"),
+});
+
+export const shareAccessInputSchema = z.object({
+  password: z.string().min(1).max(64).optional(),
+});
+
+export const spectatorCommentInputSchema = z.object({
+  content: z.string().min(1).max(800),
+});
+
 export const emailCodeRequestSchema = z.object({
   email: z.email(),
 });
@@ -112,3 +130,6 @@ export type StoryEventInput = z.infer<typeof storyEventInputSchema>;
 export type MediaJobInput = z.infer<typeof mediaJobInputSchema>;
 export type EmailCodeRequest = z.infer<typeof emailCodeRequestSchema>;
 export type EmailCodeVerify = z.infer<typeof emailCodeVerifySchema>;
+export type ShareLinkInput = z.infer<typeof shareLinkInputSchema>;
+export type ShareAccessInput = z.infer<typeof shareAccessInputSchema>;
+export type SpectatorCommentInput = z.infer<typeof spectatorCommentInputSchema>;

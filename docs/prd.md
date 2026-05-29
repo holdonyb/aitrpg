@@ -18,6 +18,7 @@ AITRPG is a browser-based tabletop roleplay platform where a human DM hosts a li
 4. AI co-DM suggests narration, NPC reactions, and scene progression
 5. Story ledger stores structured events
 6. After the session, DM generates illustrations, a recap novel, and a short video
+7. DM can share the live room and the post-session outputs with spectators
 
 ## V1 Boundaries
 
@@ -27,6 +28,9 @@ Included:
 - campaign creation
 - character creation with portrait generation trigger
 - text-only live room
+- room visibility: private, link, public
+- spectator share links and optional room password
+- login-gated spectator comments in a separate stream
 - structured story ledger
 - async media jobs
 
@@ -43,4 +47,5 @@ Excluded:
 - AI output that changes story state must pass through DM confirmation or explicit user action
 - Portrait assets must be reusable as the character anchor for later illustration and video jobs
 - Job history and room history must survive refresh and re-login
+- Spectator comments must never write directly into the main story ledger
 

@@ -8,12 +8,13 @@ import { AuthService } from "./auth/auth.service";
 import { CampaignsController } from "./campaigns/campaigns.controller";
 import { CampaignsService } from "./campaigns/campaigns.service";
 import { RoomsController } from "./rooms/rooms.controller";
+import { ShareController } from "./rooms/share.controller";
 import { RoomsService } from "./rooms/rooms.service";
 import { MemoryStoreService } from "./store/memory-store.service";
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
-  controllers: [AppController, AuthController, CampaignsController, RoomsController],
+  controllers: [AppController, AuthController, CampaignsController, RoomsController, ShareController],
   providers: [
     AppService,
     AuthService,

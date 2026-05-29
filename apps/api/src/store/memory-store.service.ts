@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 
 type User = {
   id: string;
@@ -41,6 +41,9 @@ type Room = {
   description: string;
   status: string;
   createdBy: string;
+  visibility: "PRIVATE" | "LINK" | "PUBLIC";
+  passwordHash?: string;
+  spectatorCommentEnabled: boolean;
   createdAt: string;
 };
 
@@ -63,6 +66,25 @@ type MediaJob = {
   createdAt: string;
 };
 
+type ShareLink = {
+  id: string;
+  targetType: "ROOM" | "ARTIFACT";
+  targetId: string;
+  token: string;
+  createdBy: string;
+  revokedAt?: string;
+  createdAt: string;
+};
+
+type SpectatorComment = {
+  id: string;
+  roomId: string;
+  userId: string;
+  userDisplayName: string;
+  content: string;
+  createdAt: string;
+};
+
 @Injectable()
 export class MemoryStoreService {
   private readonly users = new Map<string, User>();
@@ -73,6 +95,10 @@ export class MemoryStoreService {
   private readonly rooms = new Map<string, Room>();
   private readonly events = new Map<string, StoryEvent[]>();
   private readonly mediaJobs = new Map<string, MediaJob[]>();
+  private readonly shareLinks = new Map<string, ShareLink>();
+  private readonly shareLinksByTarget = new Map<string, ShareLink>();
+  private readonly spectatorComments = new Map<string, SpectatorComment[]>();
+  private readonly roomAccessTokens = new Set<string>();
 
   saveCode(email: string, code: string) {
     this.emailCodes.set(email, {
@@ -141,12 +167,14 @@ export class MemoryStoreService {
     return [...this.characters.values()].filter((character) => character.campaignId === campaignId);
   }
 
-  createRoom(input: Omit<Room, "id" | "createdAt">) {
+  createRoom(input: Omit<Room, "id" | "createdAt" | "passwordHash"> & { password?: string }) {
     const room: Room = {
       id: randomUUID(),
       createdAt: new Date().toISOString(),
+      passwordHash: input.password ? this.hashSecret(input.password) : undefined,
       ...input,
     };
+    delete (room as Room & { password?: string }).password;
     this.rooms.set(room.id, room);
     return room;
   }
@@ -187,5 +215,71 @@ export class MemoryStoreService {
   listMediaJobs(roomId: string) {
     return this.mediaJobs.get(roomId) ?? [];
   }
-}
 
+  createShareLink(input: Omit<ShareLink, "id" | "createdAt">) {
+    const key = `${input.targetType}:${input.targetId}`;
+    const existing = this.shareLinksByTarget.get(key);
+    if (existing && !existing.revokedAt) {
+      return existing;
+    }
+
+    const record: ShareLink = {
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      ...input,
+    };
+    this.shareLinks.set(record.token, record);
+    this.shareLinksByTarget.set(key, record);
+    return record;
+  }
+
+  getShareLink(token: string) {
+    return this.shareLinks.get(token);
+  }
+
+  grantShareAccess(token: string) {
+    this.roomAccessTokens.add(token);
+    return {
+      ok: true,
+    };
+  }
+
+  hasShareAccess(token: string) {
+    return this.roomAccessTokens.has(token);
+  }
+
+  addSpectatorComment(roomId: string, userId: string, userDisplayName: string, content: string) {
+    const record: SpectatorComment = {
+      id: randomUUID(),
+      roomId,
+      userId,
+      userDisplayName,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    const items = this.spectatorComments.get(roomId) ?? [];
+    items.push(record);
+    this.spectatorComments.set(roomId, items);
+    return record;
+  }
+
+  listSpectatorComments(roomId: string) {
+    return this.spectatorComments.get(roomId) ?? [];
+  }
+
+  private hashSecret(value: string) {
+    return createHash("sha256").update(value).digest("hex");
+  }
+
+  verifyRoomPassword(room: Room, password?: string) {
+    if (!room.passwordHash) {
+      return true;
+    }
+
+    if (!password) {
+      return false;
+    }
+
+    return this.hashSecret(password) === room.passwordHash;
+  }
+}
