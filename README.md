@@ -43,6 +43,24 @@ pnpm --filter web dev
 docker compose -f infra/docker-compose.yml up --build
 ```
 
+## GitHub Actions
+
+- `CI`: runs shared tests, API tests, web lint, and both builds
+- `Deploy`: manual workflow for VPS deployment after repository secrets are configured
+
+Required repository secrets for deployment:
+
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+- `DEPLOY_SSH_KEY`
+- `DEPLOY_TARGET_DIR`
+- `OPENAI_BASE_URL`
+- `OPENAI_API_KEY`
+- `OPENAI_TEXT_MODEL`
+- `OPENAI_IMAGE_MODEL`
+- `OPENAI_VIDEO_MODEL`
+- `JWT_SECRET`
+
 ## Current Status
 
 The repository currently contains the first implementation slice:
