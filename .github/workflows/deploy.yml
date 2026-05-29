@@ -43,6 +43,12 @@ jobs:
           test -n "${{ secrets.DEPLOY_TARGET_DIR }}"
           test -n "${{ secrets.APP_DOMAIN }}"
           test -n "${{ secrets.LETSENCRYPT_EMAIL }}"
+          test -n "${{ secrets.OPENAI_BASE_URL }}"
+          test -n "${{ secrets.OPENAI_API_KEY }}"
+          test -n "${{ secrets.OPENAI_TEXT_MODEL }}"
+          test -n "${{ secrets.OPENAI_IMAGE_MODEL }}"
+          test -n "${{ secrets.OPENAI_VIDEO_MODEL }}"
+          test -n "${{ secrets.JWT_SECRET }}"
 
       - name: Install SSH key
         run: |
@@ -64,6 +70,12 @@ jobs:
           export DEPLOY_TARGET_DIR="${{ secrets.DEPLOY_TARGET_DIR }}"
           export APP_DOMAIN="${{ secrets.APP_DOMAIN }}"
           export LETSENCRYPT_EMAIL="${{ secrets.LETSENCRYPT_EMAIL }}"
+          export OPENAI_BASE_URL="${{ secrets.OPENAI_BASE_URL }}"
+          export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
+          export OPENAI_TEXT_MODEL="${{ secrets.OPENAI_TEXT_MODEL }}"
+          export OPENAI_IMAGE_MODEL="${{ secrets.OPENAI_IMAGE_MODEL }}"
+          export OPENAI_VIDEO_MODEL="${{ secrets.OPENAI_VIDEO_MODEL }}"
+          export JWT_SECRET="${{ secrets.JWT_SECRET }}"
           cd "${{ secrets.DEPLOY_TARGET_DIR }}"
           chmod +x infra/scripts/remote-deploy.sh
           ./infra/scripts/remote-deploy.sh
