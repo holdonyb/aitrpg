@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import {
   mediaJobInputSchema,
   roomInputSchema,
+  shareAccessInputSchema,
+  shareLinkInputSchema,
+  spectatorCommentInputSchema,
   storyEventInputSchema,
 } from "@aitrpg/shared";
+import { randomUUID } from "crypto";
 
 import { MemoryStoreService } from "../store/memory-store.service";
 
@@ -13,11 +17,13 @@ export class RoomsService {
 
   createRoom(userId: string, body: unknown) {
     const input = roomInputSchema.parse(body);
-    return this.store.createRoom({
+    const room = this.store.createRoom({
       ...input,
       createdBy: userId,
       status: "READY",
     });
+
+    return this.sanitizeRoom(room);
   }
 
   getLedger(roomId: string) {
@@ -59,11 +65,110 @@ export class RoomsService {
     return this.store.addMediaJob(input);
   }
 
+  createShareLink(userId: string, roomId: string, body: unknown) {
+    const input = shareLinkInputSchema.parse(body);
+    const room = this.ensureRoom(roomId);
+    if (room.createdBy !== userId) {
+      throw new ForbiddenException("Only the DM can create a share link");
+    }
+
+    return this.store.createShareLink({
+      targetType: input.targetType,
+      targetId: roomId,
+      token: randomUUID().replaceAll("-", ""),
+      createdBy: userId,
+    });
+  }
+
+  getSharedRoom(token: string) {
+    const shareLink = this.ensureRoomShareLink(token);
+    const room = this.ensureRoom(shareLink.targetId);
+
+    return {
+      share: {
+        token: shareLink.token,
+        targetType: shareLink.targetType,
+      },
+      room: {
+        ...this.sanitizeRoom(room),
+      },
+      requiresPassword: Boolean(room.passwordHash),
+      events: this.store.listEvents(room.id),
+    };
+  }
+
+  accessSharedRoom(token: string, body: unknown) {
+    const input = shareAccessInputSchema.parse(body);
+    const shareLink = this.ensureRoomShareLink(token);
+    const room = this.ensureRoom(shareLink.targetId);
+
+    if (!this.store.verifyRoomPassword(room, input.password)) {
+      throw new UnauthorizedException("Invalid room password");
+    }
+
+    return this.store.grantShareAccess(token);
+  }
+
+  listSpectatorComments(token: string) {
+    const shareLink = this.ensureRoomShareLink(token);
+    const room = this.ensureRoom(shareLink.targetId);
+
+    return {
+      roomId: room.id,
+      comments: this.store.listSpectatorComments(room.id),
+    };
+  }
+
+  createSpectatorComment(token: string, userId: string, userDisplayName: string, body: unknown) {
+    const input = spectatorCommentInputSchema.parse(body);
+    const shareLink = this.ensureRoomShareLink(token);
+    const room = this.ensureRoom(shareLink.targetId);
+
+    if (!room.spectatorCommentEnabled) {
+      throw new ForbiddenException("Spectator comments are disabled");
+    }
+
+    return this.store.addSpectatorComment(room.id, userId, userDisplayName, input.content);
+  }
+
   private ensureRoom(roomId: string) {
     const room = this.store.getRoom(roomId);
     if (!room) {
       throw new NotFoundException("Room not found");
     }
     return room;
+  }
+
+  private ensureRoomShareLink(token: string) {
+    const shareLink = this.store.getShareLink(token);
+    if (!shareLink || shareLink.targetType !== "ROOM" || shareLink.revokedAt) {
+      throw new NotFoundException("Share link not found");
+    }
+
+    return shareLink;
+  }
+
+  private sanitizeRoom(room: {
+    id: string;
+    campaignId: string;
+    title: string;
+    description: string;
+    status: string;
+    createdBy: string;
+    visibility: "PRIVATE" | "LINK" | "PUBLIC";
+    spectatorCommentEnabled: boolean;
+    createdAt: string;
+  }) {
+    return {
+      id: room.id,
+      campaignId: room.campaignId,
+      title: room.title,
+      description: room.description,
+      status: room.status,
+      createdBy: room.createdBy,
+      visibility: room.visibility,
+      spectatorCommentEnabled: room.spectatorCommentEnabled,
+      createdAt: room.createdAt,
+    };
   }
 }

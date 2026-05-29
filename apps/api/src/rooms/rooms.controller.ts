@@ -50,5 +50,14 @@ export class RoomsController {
       type: jobType,
     });
   }
-}
 
+  @Post(":roomId/share")
+  createShareLink(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("roomId") roomId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.authService.authenticateHeader(authorization);
+    return this.roomsService.createShareLink(user.id, roomId, body);
+  }
+}

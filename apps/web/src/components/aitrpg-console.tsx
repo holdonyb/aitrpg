@@ -14,8 +14,15 @@ type SystemStatus = {
 };
 
 type Campaign = { id: string; title: string; pitch: string };
-type Room = { id: string; title: string; description: string };
+type Room = {
+  id: string;
+  title: string;
+  description: string;
+  visibility: "PRIVATE" | "LINK" | "PUBLIC";
+  spectatorCommentEnabled: boolean;
+};
 type LedgerResponse = { events: Array<{ id: string; type: string; content: string }> };
+type ShareLinkResponse = { token: string };
 
 async function apiFetch(path: string, init?: RequestInit, token?: string) {
   const headers = new Headers(init?.headers);
@@ -50,10 +57,14 @@ export function AitrpgConsole() {
   const [campaignPitch, setCampaignPitch] = useState("一支边境冒险队必须阻止古王冠在战乱中复苏。");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
+  const [roomVisibility, setRoomVisibility] = useState<"PRIVATE" | "LINK" | "PUBLIC">("LINK");
+  const [roomPassword, setRoomPassword] = useState("stormgate");
+  const [spectatorCommentEnabled, setSpectatorCommentEnabled] = useState(true);
   const [eventText, setEventText] = useState("夜色压进树林，篝火照出每个人不同的表情。");
   const [ledger, setLedger] = useState<LedgerResponse | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [jobStatus, setJobStatus] = useState("");
+  const [shareLink, setShareLink] = useState("");
   const [status, setStatus] = useState("等待操作");
 
   useEffect(() => {
@@ -113,12 +124,33 @@ export function AitrpgConsole() {
           campaignId: campaign.id,
           title: "第一夜营地",
           description: "篝火边的第一轮情报交换与试探。",
+          visibility: roomVisibility,
+          password: roomPassword || undefined,
+          spectatorCommentEnabled,
         }),
       },
       token,
     );
     setRoom(response);
     setStatus("房间已创建");
+  }
+
+  async function createShareLink() {
+    if (!room) return;
+    setStatus("生成观战链接中");
+    const response = (await apiFetch(
+      `/rooms/${room.id}/share`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          targetType: "ROOM",
+        }),
+      },
+      token,
+    )) as ShareLinkResponse;
+    const nextLink = `${window.location.origin}/share/rooms/${response.token}`;
+    setShareLink(nextLink);
+    setStatus("观战链接已生成");
   }
 
   async function postEvent() {
@@ -253,8 +285,41 @@ export function AitrpgConsole() {
             <p>系统状态: {system ? `${system.product} / ${system.authMode}` : "加载中"}</p>
             <p className="mt-2">战役: {campaign?.title ?? "未创建"}</p>
             <p className="mt-2">房间: {room?.title ?? "未创建"}</p>
+            <p className="mt-2">可见性: {room?.visibility ?? "未设置"}</p>
             <p className="mt-2">队列任务: {jobStatus || "暂无"}</p>
           </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-[#d8d3c7]">房间可见性</span>
+              <select
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                value={roomVisibility}
+                onChange={(event) =>
+                  setRoomVisibility(event.target.value as "PRIVATE" | "LINK" | "PUBLIC")
+                }
+              >
+                <option value="PRIVATE">私有</option>
+                <option value="LINK">持链接可见</option>
+                <option value="PUBLIC">公开</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-[#d8d3c7]">观战密码</span>
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                value={roomPassword}
+                onChange={(event) => setRoomPassword(event.target.value)}
+              />
+            </label>
+          </div>
+          <label className="flex items-center gap-3 text-[#d8d3c7]">
+            <input
+              type="checkbox"
+              checked={spectatorCommentEnabled}
+              onChange={(event) => setSpectatorCommentEnabled(event.target.checked)}
+            />
+            开启观众评论流
+          </label>
           <button
             className="rounded-full border border-[var(--accent)] px-4 py-2 text-[var(--accent)] disabled:opacity-40"
             disabled={!campaign}
@@ -262,6 +327,23 @@ export function AitrpgConsole() {
           >
             创建房间
           </button>
+          <button
+            className="rounded-full border border-[#cdb8ff] px-4 py-2 text-[#cdb8ff] disabled:opacity-40"
+            disabled={!room}
+            onClick={createShareLink}
+          >
+            生成观战链接
+          </button>
+          {shareLink ? (
+            <a
+              className="block break-all rounded-2xl border border-white/8 bg-black/10 px-4 py-3 text-[#d8d3c7] underline decoration-white/20 underline-offset-4"
+              href={shareLink}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {shareLink}
+            </a>
+          ) : null}
           <label className="block">
             <span className="mb-2 block text-[#d8d3c7]">叙事事件</span>
             <textarea

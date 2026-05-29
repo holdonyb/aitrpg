@@ -6,8 +6,9 @@
 2. Campaign creation
 3. Character forge
 4. Live session room
-5. Afterplay studio
-6. Admin system page
+5. Spectator room view
+6. Afterplay studio
+7. Admin system page
 
 ## Wireframe Notes
 
@@ -34,6 +35,14 @@
 - right rail for AI co-DM suggestions
 - left rail for participants, characters, and current scene summary
 - footer composer with role context and submit action
+- share controls for visibility, password, and spectator comments
+
+### Spectator room view
+
+- read-only main timeline
+- password gate when enabled
+- login-gated spectator comment stream
+- no DM controls and no write access to the story ledger
 
 ### Afterplay studio
 
