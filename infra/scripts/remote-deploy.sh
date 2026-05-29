@@ -6,11 +6,6 @@ if [[ -z "${APP_DOMAIN:-}" ]]; then
   exit 1
 fi
 
-if [[ -z "${LETSENCRYPT_EMAIL:-}" ]]; then
-  echo "LETSENCRYPT_EMAIL is required" >&2
-  exit 1
-fi
-
 if [[ -z "${DEPLOY_TARGET_DIR:-}" ]]; then
   echo "DEPLOY_TARGET_DIR is required" >&2
   exit 1
@@ -79,13 +74,26 @@ nginx -t
 systemctl reload nginx
 
 if [[ ! -d "/etc/letsencrypt/live/${APP_DOMAIN}" ]]; then
-  certbot certonly \
-    --webroot \
-    -w /var/www/certbot \
-    -d "${APP_DOMAIN}" \
-    --email "${LETSENCRYPT_EMAIL}" \
-    --agree-tos \
-    --non-interactive
+  if find /etc/letsencrypt/accounts -maxdepth 4 -name regr.json 2>/dev/null | grep -q .; then
+    certbot certonly \
+      --webroot \
+      -w /var/www/certbot \
+      -d "${APP_DOMAIN}" \
+      --non-interactive
+  else
+    if [[ -z "${LETSENCRYPT_EMAIL:-}" ]]; then
+      echo "LETSENCRYPT_EMAIL is required when no certbot account exists" >&2
+      exit 1
+    fi
+
+    certbot certonly \
+      --webroot \
+      -w /var/www/certbot \
+      -d "${APP_DOMAIN}" \
+      --email "${LETSENCRYPT_EMAIL}" \
+      --agree-tos \
+      --non-interactive
+  fi
 fi
 
 render_template \
