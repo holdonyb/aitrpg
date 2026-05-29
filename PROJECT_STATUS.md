@@ -2,7 +2,7 @@
 
 ## Goal
 
-Ship an initial production-ready ATRPG web system with:
+Ship an initial production-ready AITRPG web system with:
 
 - docs-first product definition
 - Next.js frontend

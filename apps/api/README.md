@@ -1,6 +1,6 @@
-# ATRPG API
+# AITRPG API
 
-NestJS backend for ATRPG.
+NestJS backend for AITRPG.
 
 ## Responsibilities
 

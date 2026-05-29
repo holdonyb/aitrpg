@@ -17,7 +17,7 @@
     "baseUrl": "./",
     "incremental": true,
     "paths": {
-      "@atrpg/shared": [
+      "@aitrpg/shared": [
         "../../packages/shared/src"
       ]
     },

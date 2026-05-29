@@ -11,7 +11,7 @@ RUN pnpm install --frozen-lockfile=false
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 
-RUN pnpm --filter @atrpg/shared build
+RUN pnpm --filter @aitrpg/shared build
 RUN pnpm --filter api build
 
 EXPOSE 4000

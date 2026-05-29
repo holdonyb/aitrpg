@@ -4,7 +4,7 @@ import { Injectable } from "@nestjs/common";
 export class AppService {
   getSystemStatus() {
     return {
-      product: "ATRPG",
+      product: "AITRPG",
       authMode: "email-code",
       roomSurface: "text-live",
       asyncMedia: ["portrait", "illustration", "novel", "video"],

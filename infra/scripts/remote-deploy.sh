@@ -77,7 +77,7 @@ MAILPIT_WEB_PORT=${MAILPIT_WEB_PORT}
 MINIO_API_PORT=${MINIO_API_PORT}
 MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT}
 
-DATABASE_URL=postgresql://atrpg:atrpg@postgres:5432/atrpg
+DATABASE_URL=postgresql://aitrpg:aitrpg@postgres:5432/aitrpg
 REDIS_URL=redis://redis:6379
 
 JWT_SECRET=${JWT_SECRET}
@@ -95,7 +95,7 @@ OPENAI_VIDEO_MODEL=${OPENAI_VIDEO_MODEL}
 
 S3_ENDPOINT=http://minio:9000
 S3_REGION=us-east-1
-S3_BUCKET=atrpg-assets
+S3_BUCKET=aitrpg-assets
 S3_ACCESS_KEY=minioadmin
 S3_SECRET_KEY=minioadmin
 EOF
@@ -103,7 +103,7 @@ EOF
 ln -sfn .env.production "${DEPLOY_TARGET_DIR}/.env"
 
 render_template \
-  "${DEPLOY_TARGET_DIR}/infra/nginx/atrpg.http.conf.template" \
+  "${DEPLOY_TARGET_DIR}/infra/nginx/aitrpg.http.conf.template" \
   "/tmp/${APP_DOMAIN}.http.conf"
 
 maybe_sudo cp "/tmp/${APP_DOMAIN}.http.conf" "/etc/nginx/sites-available/${APP_DOMAIN}"
@@ -131,7 +131,7 @@ if [[ ! -d "/etc/letsencrypt/live/${APP_DOMAIN}" ]]; then
 fi
 
 render_template \
-  "${DEPLOY_TARGET_DIR}/infra/nginx/atrpg.https.conf.template" \
+  "${DEPLOY_TARGET_DIR}/infra/nginx/aitrpg.https.conf.template" \
   "/tmp/${APP_DOMAIN}.https.conf"
 
 maybe_sudo cp "/tmp/${APP_DOMAIN}.https.conf" "/etc/nginx/sites-available/${APP_DOMAIN}"

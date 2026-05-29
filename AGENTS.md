@@ -1,8 +1,8 @@
-# AGENTS.md - ATRPG
+# AGENTS.md - AITRPG
 
 ## Project Focus
 
-ATRPG is a production-oriented web app for AI-assisted tabletop roleplay.
+AITRPG is a production-oriented web app for AI-assisted tabletop roleplay.
 The primary user experience is a real-time text room with a human DM, human players, and AI agents acting as party members, NPCs, or a co-DM.
 
 ## First Read
@@ -25,7 +25,7 @@ Before changing product behavior, read:
 ## Commands
 
 - `pnpm install`
-- `pnpm --filter @atrpg/shared build`
+- `pnpm --filter @aitrpg/shared build`
 - `pnpm --filter api test`
 - `pnpm --filter web lint`
 

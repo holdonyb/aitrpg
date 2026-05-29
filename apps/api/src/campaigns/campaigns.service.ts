@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import { campaignInputSchema, characterInputSchema } from "@atrpg/shared";
+import { campaignInputSchema, characterInputSchema } from "@aitrpg/shared";
 
 import { MemoryStoreService } from "../store/memory-store.service";
 

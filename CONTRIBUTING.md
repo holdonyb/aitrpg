@@ -10,7 +10,7 @@
 ## Verification
 
 ```bash
-pnpm --filter @atrpg/shared test
+pnpm --filter @aitrpg/shared test
 pnpm --filter api test
 pnpm --filter api test:e2e
 pnpm --filter web lint

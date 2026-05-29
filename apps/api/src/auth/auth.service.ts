@@ -28,7 +28,7 @@ export class AuthService {
     }
 
     const user = this.store.findOrCreateUser(email);
-    const secret = this.configService.get<string>("JWT_SECRET") || "atrpg-dev-secret";
+    const secret = this.configService.get<string>("JWT_SECRET") || "aitrpg-dev-secret";
     const token = jwt.sign({ sub: user.id, email: user.email }, secret, {
       expiresIn: "7d",
     });
@@ -45,7 +45,7 @@ export class AuthService {
     }
 
     const token = header.slice("Bearer ".length);
-    const secret = this.configService.get<string>("JWT_SECRET") || "atrpg-dev-secret";
+    const secret = this.configService.get<string>("JWT_SECRET") || "aitrpg-dev-secret";
     const payload = jwt.verify(token, secret) as { sub: string };
     const user = this.store.getUser(payload.sub);
 

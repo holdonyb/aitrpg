@@ -36,12 +36,12 @@ async function apiFetch(path: string, init?: RequestInit, token?: string) {
   return response.json();
 }
 
-export function AtrpgConsole() {
+export function AitrpgConsole() {
   const [token, setToken] = useState(() => {
     if (typeof window === "undefined") {
       return "";
     }
-    return window.localStorage.getItem("atrpg-token") ?? "";
+    return window.localStorage.getItem("aitrpg-token") ?? "";
   });
   const [system, setSystem] = useState<SystemStatus | null>(null);
   const [email, setEmail] = useState("dm@example.com");
@@ -81,7 +81,7 @@ export function AtrpgConsole() {
       body: JSON.stringify({ email, code }),
     });
     setToken(response.token);
-    window.localStorage.setItem("atrpg-token", response.token);
+    window.localStorage.setItem("aitrpg-token", response.token);
     setStatus(`已登录为 ${response.user.displayName}`);
   }
 

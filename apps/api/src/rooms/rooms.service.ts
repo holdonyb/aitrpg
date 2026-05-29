@@ -3,7 +3,7 @@ import {
   mediaJobInputSchema,
   roomInputSchema,
   storyEventInputSchema,
-} from "@atrpg/shared";
+} from "@aitrpg/shared";
 
 import { MemoryStoreService } from "../store/memory-store.service";
 

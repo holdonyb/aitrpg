@@ -1,4 +1,4 @@
-# ATRPG UI Prototype
+# AITRPG UI Prototype
 
 ## Surface Map
 
