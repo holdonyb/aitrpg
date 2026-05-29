@@ -4,7 +4,7 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "moduleNameMapper": {
-    "^@atrpg/shared$": "<rootDir>/../../../packages/shared/dist"
+    "^@aitrpg/shared$": "<rootDir>/../../../packages/shared/dist"
   },
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"

@@ -1,8 +1,8 @@
-# ATRPG PRD
+# AITRPG PRD
 
 ## Product Summary
 
-ATRPG is a browser-based tabletop roleplay platform where a human DM hosts a live text campaign with human players and AI-controlled characters. The product turns each session into reusable creative assets: character portraits, post-session illustrations, a narrative recap, and a short video.
+AITRPG is a browser-based tabletop roleplay platform where a human DM hosts a live text campaign with human players and AI-controlled characters. The product turns each session into reusable creative assets: character portraits, post-session illustrations, a narrative recap, and a short video.
 
 ## Primary Users
 

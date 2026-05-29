@@ -1,5 +1,5 @@
 import { Body, Controller, Headers, Post } from "@nestjs/common";
-import { emailCodeRequestSchema, emailCodeVerifySchema } from "@atrpg/shared";
+import { emailCodeRequestSchema, emailCodeVerifySchema } from "@aitrpg/shared";
 
 import { AuthService } from "./auth.service";
 

@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: atrpg
-      POSTGRES_PASSWORD: atrpg
-      POSTGRES_DB: atrpg
+      POSTGRES_USER: aitrpg
+      POSTGRES_PASSWORD: aitrpg
+      POSTGRES_DB: aitrpg
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U atrpg -d atrpg"]
+      test: ["CMD-SHELL", "pg_isready -U aitrpg -d aitrpg"]
       interval: 10s
       timeout: 5s
       retries: 5

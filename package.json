@@ -1,5 +1,5 @@
 {
-  "name": "atrpg",
+  "name": "aitrpg",
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.11.0",
@@ -7,8 +7,8 @@
     "dev": "pnpm --parallel --filter web --filter api dev",
     "dev:web": "pnpm --filter web dev",
     "dev:api": "pnpm --filter api start:dev",
-    "build": "pnpm --filter @atrpg/shared build && pnpm --filter api build && pnpm --filter web build",
-    "test": "pnpm --filter @atrpg/shared test && pnpm --filter api test",
+    "build": "pnpm --filter @aitrpg/shared build && pnpm --filter api build && pnpm --filter web build",
+    "test": "pnpm --filter @aitrpg/shared test && pnpm --filter api test",
     "lint": "pnpm --filter web lint && pnpm --filter api lint",
     "format": "pnpm --filter api format"
   }

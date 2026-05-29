@@ -20,7 +20,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@atrpg/shared": ["../../packages/shared/src"]
+      "@aitrpg/shared": ["../../packages/shared/src"]
     }
   },
   "include": [

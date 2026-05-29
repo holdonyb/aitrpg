@@ -13,15 +13,15 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/apps/api/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "test": "pnpm --filter @atrpg/shared build && jest",
+    "test": "pnpm --filter @aitrpg/shared build && jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "pnpm --filter @atrpg/shared build && jest --config ./test/jest-e2e.json",
+    "test:e2e": "pnpm --filter @aitrpg/shared build && jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
-    "@atrpg/shared": "workspace:*",
+    "@aitrpg/shared": "workspace:*",
     "@nestjs/config": "^4.0.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
@@ -76,7 +76,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@atrpg/shared$": "<rootDir>/../../packages/shared/dist"
+      "^@aitrpg/shared$": "<rootDir>/../../packages/shared/dist"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

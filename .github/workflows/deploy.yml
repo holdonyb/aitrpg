@@ -27,7 +27,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build shared
-        run: pnpm --filter @atrpg/shared build
+        run: pnpm --filter @aitrpg/shared build
 
       - name: Build API
         run: pnpm --filter api build

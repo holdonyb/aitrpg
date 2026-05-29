@@ -1,4 +1,4 @@
-# ATRPG System Design
+# AITRPG System Design
 
 ## Runtime Overview
 

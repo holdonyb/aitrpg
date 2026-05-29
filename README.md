@@ -1,6 +1,6 @@
-# ATRPG
+# AITRPG
 
-ATRPG is a web-based AI tabletop RPG platform for real-time text sessions with a human DM, human players, and AI-controlled party members or NPCs.
+AITRPG is a web-based AI tabletop RPG platform for real-time text sessions with a human DM, human players, and AI-controlled party members or NPCs.
 
 ## Stack
 
@@ -23,7 +23,7 @@ ATRPG is a web-based AI tabletop RPG platform for real-time text sessions with a
 
 ```bash
 pnpm install
-pnpm --filter @atrpg/shared build
+pnpm --filter @aitrpg/shared build
 pnpm --filter api test
 pnpm --filter web lint
 pnpm --filter api start:dev

@@ -6,7 +6,7 @@ describe("AppService", () => {
 
     expect(service.getSystemStatus()).toEqual(
       expect.objectContaining({
-        product: "ATRPG",
+        product: "AITRPG",
         authMode: "email-code",
         roomSurface: "text-live",
       }),

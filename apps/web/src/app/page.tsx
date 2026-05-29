@@ -1,4 +1,4 @@
-import { AtrpgConsole } from "@/components/atrpg-console";
+import { AitrpgConsole } from "@/components/aitrpg-console";
 
 export default function HomePage() {
   return (
@@ -6,7 +6,7 @@ export default function HomePage() {
       <section className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
         <div className="rounded-[28px] border border-[var(--panel-border)] bg-[var(--panel)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
           <p className="mb-4 text-sm uppercase tracking-[0.3em] text-[var(--accent-2)]">
-            ATRPG / AI 协作跑团
+            AITRPG / AI 协作跑团
           </p>
           <h1 className="max-w-3xl font-[family-name:var(--font-display)] text-5xl leading-none text-[var(--foreground)] sm:text-6xl">
             人类做 DM，Agent 当冒险队与副 DM。
@@ -29,7 +29,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <AtrpgConsole />
+      <AitrpgConsole />
     </main>
   );
 }

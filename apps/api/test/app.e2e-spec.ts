@@ -4,7 +4,7 @@ import request from "supertest";
 import { App } from "supertest/types";
 import { AppModule } from "../src/app.module";
 
-describe("ATRPG API (e2e)", () => {
+describe("AITRPG API (e2e)", () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
@@ -20,7 +20,7 @@ describe("ATRPG API (e2e)", () => {
   it("returns system metadata", async () => {
     const response = await request(app.getHttpServer()).get("/api/system").expect(200);
 
-    expect(response.body.product).toBe("ATRPG");
+    expect(response.body.product).toBe("AITRPG");
   });
 
   it("issues a login code and verifies it", async () => {

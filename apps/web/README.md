@@ -1,13 +1,13 @@
-# ATRPG Web
+# AITRPG Web
 
-Next.js frontend for ATRPG.
+Next.js frontend for AITRPG.
 
 ## Responsibilities
 
 - login and campaign entry flow
 - live room operator surface
 - afterplay studio controls
-- API-driven browser UI for the ATRPG MVP
+- API-driven browser UI for the AITRPG MVP
 
 ## Commands
 
