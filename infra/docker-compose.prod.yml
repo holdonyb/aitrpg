@@ -1,0 +1,21 @@
+services:
+  postgres:
+    ports: []
+
+  redis:
+    ports: []
+
+  mailpit:
+    ports: []
+
+  minio:
+    ports: []
+
+  api:
+    env_file:
+      - ../.env.production
+
+  web:
+    env_file:
+      - ../.env.production
+

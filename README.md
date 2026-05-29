@@ -43,6 +43,12 @@ pnpm --filter web dev
 docker compose -f infra/docker-compose.yml up --build
 ```
 
+Production compose:
+
+```bash
+docker-compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up --build -d
+```
+
 ## GitHub Actions
 
 - `CI`: runs shared tests, API tests, web lint, and both builds
