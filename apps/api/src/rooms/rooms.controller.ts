@@ -1,9 +1,17 @@
-import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 
-import { AuthService } from "../auth/auth.service";
-import { RoomsService } from "./rooms.service";
+import { AuthService } from '../auth/auth.service';
+import { RoomsService } from './rooms.service';
 
-@Controller("rooms")
+@Controller('rooms')
 export class RoomsController {
   constructor(
     private readonly authService: AuthService,
@@ -11,53 +19,84 @@ export class RoomsController {
   ) {}
 
   @Post()
-  createRoom(@Headers("authorization") authorization: string | undefined, @Body() body: unknown) {
-    const user = this.authService.authenticateHeader(authorization);
+  async createRoom(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const user = await this.authService.authenticateHeader(authorization);
     return this.roomsService.createRoom(user.id, body);
   }
 
-  @Get(":roomId/ledger")
-  getLedger(@Headers("authorization") authorization: string | undefined, @Param("roomId") roomId: string) {
-    this.authService.authenticateHeader(authorization);
+  @Get()
+  async listRooms(
+    @Headers('authorization') authorization: string | undefined,
+    @Query('campaignId') campaignId?: string,
+  ) {
+    const user = await this.authService.authenticateHeader(authorization);
+    return this.roomsService.listRooms(user.id, campaignId);
+  }
+
+  @Get(':roomId')
+  async getRoom(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('roomId') roomId: string,
+  ) {
+    const user = await this.authService.authenticateHeader(authorization);
+    return this.roomsService.getRoom(user.id, roomId);
+  }
+
+  @Get(':roomId/ledger')
+  async getLedger(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('roomId') roomId: string,
+  ) {
+    await this.authService.authenticateHeader(authorization);
     return this.roomsService.getLedger(roomId);
   }
 
-  @Post(":roomId/events")
-  addEvent(@Headers("authorization") authorization: string | undefined, @Param("roomId") roomId: string, @Body() body: Record<string, unknown>) {
-    this.authService.authenticateHeader(authorization);
+  @Post(':roomId/events')
+  async addEvent(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('roomId') roomId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    await this.authService.authenticateHeader(authorization);
     return this.roomsService.addEvent({
       ...body,
       roomId,
     });
   }
 
-  @Post(":roomId/dm-suggestions")
-  getSuggestions(@Headers("authorization") authorization: string | undefined, @Param("roomId") roomId: string) {
-    this.authService.authenticateHeader(authorization);
+  @Post(':roomId/dm-suggestions')
+  async getSuggestions(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('roomId') roomId: string,
+  ) {
+    await this.authService.authenticateHeader(authorization);
     return this.roomsService.getSuggestions(roomId);
   }
 
-  @Post(":roomId/afterplay/:jobType")
-  createAfterplayJob(
-    @Headers("authorization") authorization: string | undefined,
-    @Param("roomId") roomId: string,
-    @Param("jobType") jobType: string,
+  @Post(':roomId/afterplay/:jobType')
+  async createAfterplayJob(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('roomId') roomId: string,
+    @Param('jobType') jobType: string,
     @Body() body: Record<string, unknown>,
   ) {
-    this.authService.authenticateHeader(authorization);
+    await this.authService.authenticateHeader(authorization);
     return this.roomsService.createMediaJob(roomId, {
       ...body,
       type: jobType,
     });
   }
 
-  @Post(":roomId/share")
-  createShareLink(
-    @Headers("authorization") authorization: string | undefined,
-    @Param("roomId") roomId: string,
+  @Post(':roomId/share')
+  async createShareLink(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('roomId') roomId: string,
     @Body() body: unknown,
   ) {
-    const user = this.authService.authenticateHeader(authorization);
+    const user = await this.authService.authenticateHeader(authorization);
     return this.roomsService.createShareLink(user.id, roomId, body);
   }
 }

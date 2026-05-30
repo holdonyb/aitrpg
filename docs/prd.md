@@ -26,7 +26,7 @@ Included:
 
 - email-code login
 - campaign creation
-- character creation with portrait generation trigger
+- character creation with persisted portrait generation trigger
 - text-only live room
 - room visibility: private, link, public
 - spectator share links and optional room password

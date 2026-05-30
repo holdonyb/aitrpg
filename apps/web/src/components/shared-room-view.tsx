@@ -21,6 +21,7 @@ type SharedRoomPayload = {
     spectatorCommentEnabled: boolean;
   };
   requiresPassword: boolean;
+  accessGranted: boolean;
   events: Array<{
     id: string;
     type: string;
@@ -62,6 +63,7 @@ export function SharedRoomView({ token }: { token: string }) {
   const [password, setPassword] = useState("stormgate");
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<CommentPayload["comments"]>([]);
+  const [shareAccessToken, setShareAccessToken] = useState("");
   const [status, setStatus] = useState("加载观战页");
   const [authedToken] = useState(() => {
     if (typeof window === "undefined") {
@@ -72,30 +74,43 @@ export function SharedRoomView({ token }: { token: string }) {
   });
 
   useEffect(() => {
-    apiFetch(`/share/rooms/${token}`)
+    const headers = shareAccessToken
+      ? { "x-share-access": shareAccessToken }
+      : undefined;
+
+    apiFetch(`/share/rooms/${token}`, { headers })
       .then((payload: SharedRoomPayload) => {
         setRoom(payload);
         setStatus("房间信息已加载");
       })
       .catch((error: Error) => setStatus(`加载失败: ${error.message}`));
-  }, [token]);
+  }, [shareAccessToken, token]);
 
   useEffect(() => {
     if (!authedToken) {
       return;
     }
 
-    apiFetch(`/share/rooms/${token}/comments`, {}, authedToken)
+    apiFetch(
+      `/share/rooms/${token}/comments`,
+      {
+        headers: shareAccessToken
+          ? { "x-share-access": shareAccessToken }
+          : undefined,
+      },
+      authedToken,
+    )
       .then((payload: CommentPayload) => setComments(payload.comments))
       .catch(() => undefined);
-  }, [authedToken, token]);
+  }, [authedToken, shareAccessToken, token]);
 
   async function unlockRoom() {
     setStatus("验证观战密码");
-    await apiFetch(`/share/rooms/${token}/access`, {
+    const payload = (await apiFetch(`/share/rooms/${token}/access`, {
       method: "POST",
       body: JSON.stringify({ password }),
-    });
+    })) as { accessToken: string };
+    setShareAccessToken(payload.accessToken);
     setStatus("观战访问已授权");
   }
 
@@ -110,13 +125,20 @@ export function SharedRoomView({ token }: { token: string }) {
       {
         method: "POST",
         body: JSON.stringify({ content: comment }),
+        headers: shareAccessToken
+          ? { "x-share-access": shareAccessToken }
+          : undefined,
       },
       authedToken,
     );
 
     const payload = (await apiFetch(
       `/share/rooms/${token}/comments`,
-      {},
+      {
+        headers: shareAccessToken
+          ? { "x-share-access": shareAccessToken }
+          : undefined,
+      },
       authedToken,
     )) as CommentPayload;
     setComments(payload.comments);
@@ -146,6 +168,7 @@ export function SharedRoomView({ token }: { token: string }) {
             <div className="rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-[#d8d3c7]">
               <p>可见性: {room?.room.visibility ?? "加载中"}</p>
               <p className="mt-2">评论流: {room?.room.spectatorCommentEnabled ? "开启" : "关闭"}</p>
+              <p className="mt-2">时间线访问: {room?.accessGranted ? "已授权" : "未授权"}</p>
               <p className="mt-2">
                 登录状态: {authedToken ? "已检测到本地登录令牌" : "未登录，不能发评论"}
               </p>
@@ -188,7 +211,11 @@ export function SharedRoomView({ token }: { token: string }) {
                 </div>
               ))
             ) : (
-              <div className="text-[#c8c1b5]">主时间线还没有事件。</div>
+              <div className="text-[#c8c1b5]">
+                {room?.requiresPassword && !room?.accessGranted
+                  ? "需要先通过观战密码验证，主时间线才会显示。"
+                  : "主时间线还没有事件。"}
+              </div>
             )}
           </div>
         </div>
@@ -206,7 +233,11 @@ export function SharedRoomView({ token }: { token: string }) {
             />
             <button
               className="w-full bg-[var(--accent-2)] px-4 py-3 text-left text-black disabled:opacity-40"
-              disabled={!authedToken || !room?.room.spectatorCommentEnabled}
+              disabled={
+                !authedToken ||
+                !room?.room.spectatorCommentEnabled ||
+                (room?.requiresPassword && !room?.accessGranted)
+              }
               onClick={postComment}
             >
               发送评论

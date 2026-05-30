@@ -113,6 +113,10 @@ export const spectatorCommentInputSchema = z.object({
   content: z.string().min(1).max(800),
 });
 
+export const portraitInputSchema = z.object({
+  prompt: z.string().min(4).max(400).optional(),
+});
+
 export const emailCodeRequestSchema = z.object({
   email: z.email(),
 });
@@ -133,3 +137,4 @@ export type EmailCodeVerify = z.infer<typeof emailCodeVerifySchema>;
 export type ShareLinkInput = z.infer<typeof shareLinkInputSchema>;
 export type ShareAccessInput = z.infer<typeof shareAccessInputSchema>;
 export type SpectatorCommentInput = z.infer<typeof spectatorCommentInputSchema>;
+export type PortraitInput = z.infer<typeof portraitInputSchema>;

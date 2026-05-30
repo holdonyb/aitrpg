@@ -12,6 +12,7 @@ COPY packages/shared packages/shared
 COPY apps/api apps/api
 
 RUN pnpm --filter @aitrpg/shared build
+RUN pnpm --filter api prisma:generate
 RUN pnpm --filter api build
 
 EXPOSE 4000

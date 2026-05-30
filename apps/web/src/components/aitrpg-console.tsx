@@ -14,14 +14,30 @@ type SystemStatus = {
 };
 
 type Campaign = { id: string; title: string; pitch: string };
+type Character = {
+  id: string;
+  name: string;
+  ancestry: string;
+  className: string;
+  portrait: null | {
+    id: string;
+    imageUrl: string;
+    status: string;
+  };
+};
 type Room = {
   id: string;
+  campaignId?: string;
   title: string;
   description: string;
+  status?: string;
   visibility: "PRIVATE" | "LINK" | "PUBLIC";
   spectatorCommentEnabled: boolean;
 };
-type LedgerResponse = { events: Array<{ id: string; type: string; content: string }> };
+type LedgerResponse = {
+  events: Array<{ id: string; type: string; content: string }>;
+  jobs: Array<{ id: string; type: string; status: string; title: string }>;
+};
 type ShareLinkResponse = { token: string };
 
 async function apiFetch(path: string, init?: RequestInit, token?: string) {
@@ -54,13 +70,29 @@ export function AitrpgConsole() {
   const [email, setEmail] = useState("dm@example.com");
   const [code, setCode] = useState("");
   const [campaignTitle, setCampaignTitle] = useState("灰烬王座");
-  const [campaignPitch, setCampaignPitch] = useState("一支边境冒险队必须阻止古王冠在战乱中复苏。");
+  const [campaignPitch, setCampaignPitch] = useState(
+    "一支边境冒险队必须阻止古王冠在战乱中复苏。",
+  );
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [characterName, setCharacterName] = useState("Lyra");
+  const [characterAncestry, setCharacterAncestry] = useState("Human");
+  const [characterClassName, setCharacterClassName] = useState("MAGE");
+  const [characterBackground, setCharacterBackground] = useState(
+    "A frontier scholar who left the capital to track forbidden fire rites.",
+  );
+  const [characterPersonality, setCharacterPersonality] = useState(
+    "Calm, precise, and stubborn under pressure.",
+  );
   const [room, setRoom] = useState<Room | null>(null);
-  const [roomVisibility, setRoomVisibility] = useState<"PRIVATE" | "LINK" | "PUBLIC">("LINK");
+  const [roomVisibility, setRoomVisibility] = useState<
+    "PRIVATE" | "LINK" | "PUBLIC"
+  >("LINK");
   const [roomPassword, setRoomPassword] = useState("stormgate");
   const [spectatorCommentEnabled, setSpectatorCommentEnabled] = useState(true);
-  const [eventText, setEventText] = useState("夜色压进树林，篝火照出每个人不同的表情。");
+  const [eventText, setEventText] = useState(
+    "夜色压进树林，篝火照出每个人不同的表情。",
+  );
   const [ledger, setLedger] = useState<LedgerResponse | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [jobStatus, setJobStatus] = useState("");
@@ -92,9 +124,82 @@ export function AitrpgConsole() {
       body: JSON.stringify({ email, code }),
     });
     setToken(response.token);
-    window.localStorage.setItem("aitrpg-token", response.token);
     setStatus(`已登录为 ${response.user.displayName}`);
   }
+
+  async function restoreWorkspace(authToken: string) {
+    setStatus("恢复最近的战役和房间");
+    const campaigns = (await apiFetch(
+      "/campaigns",
+      {},
+      authToken,
+    )) as Campaign[];
+    const lastCampaignId = window.localStorage.getItem("aitrpg-campaign-id");
+    const nextCampaign =
+      campaigns.find((item) => item.id === lastCampaignId) ??
+      campaigns[0] ??
+      null;
+    setCampaign(nextCampaign);
+
+    if (!nextCampaign) {
+      setCharacters([]);
+      setRoom(null);
+      setLedger(null);
+      setStatus("已登录，尚未创建战役");
+      return;
+    }
+
+    window.localStorage.setItem("aitrpg-campaign-id", nextCampaign.id);
+
+    const nextCharacters = (await apiFetch(
+      `/campaigns/${nextCampaign.id}/characters`,
+      {},
+      authToken,
+    )) as Character[];
+    setCharacters(nextCharacters);
+
+    const rooms = (await apiFetch(
+      `/rooms?campaignId=${nextCampaign.id}`,
+      {},
+      authToken,
+    )) as Room[];
+    const lastRoomId = window.localStorage.getItem("aitrpg-room-id");
+    const nextRoom =
+      rooms.find((item) => item.id === lastRoomId) ?? rooms[0] ?? null;
+    setRoom(nextRoom);
+
+    if (!nextRoom) {
+      setLedger(null);
+      setStatus("已恢复战役，尚未创建房间");
+      return;
+    }
+
+    window.localStorage.setItem("aitrpg-room-id", nextRoom.id);
+    const nextLedger = (await apiFetch(
+      `/rooms/${nextRoom.id}/ledger`,
+      {},
+      authToken,
+    )) as LedgerResponse;
+    setLedger(nextLedger);
+    const latestJob = nextLedger.jobs.at(-1);
+    setJobStatus(latestJob ? `${latestJob.type} / ${latestJob.status}` : "");
+    setStatus("已恢复最近的战役、角色和房间");
+  }
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    window.localStorage.setItem("aitrpg-token", token);
+    const timer = window.setTimeout(() => {
+      void restoreWorkspace(token);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [token]);
 
   async function createCampaign() {
     setStatus("创建战役中");
@@ -110,7 +215,59 @@ export function AitrpgConsole() {
       token,
     );
     setCampaign(response);
+    window.localStorage.setItem("aitrpg-campaign-id", response.id);
+    setCharacters([]);
+    setRoom(null);
+    setLedger(null);
     setStatus("战役已创建");
+  }
+
+  async function refreshCharacters() {
+    if (!campaign) return;
+    const response = (await apiFetch(
+      `/campaigns/${campaign.id}/characters`,
+      {},
+      token,
+    )) as Character[];
+    setCharacters(response);
+  }
+
+  async function createCharacter() {
+    if (!campaign) return;
+    setStatus("创建角色中");
+    await apiFetch(
+      `/campaigns/${campaign.id}/characters`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name: characterName,
+          ancestry: characterAncestry,
+          className: characterClassName,
+          background: characterBackground,
+          personality: characterPersonality,
+          controlledBy: "PLAYER",
+        }),
+      },
+      token,
+    );
+    await refreshCharacters();
+    setStatus("角色已创建");
+  }
+
+  async function generatePortrait(character: Character) {
+    setStatus("生成角色 portrait 中");
+    await apiFetch(
+      `/characters/${character.id}/portrait`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          prompt: `${character.name} fantasy portrait with ember light and travel-worn robes.`,
+        }),
+      },
+      token,
+    );
+    await refreshCharacters();
+    setStatus("角色 portrait 已生成");
   }
 
   async function createRoom() {
@@ -132,6 +289,7 @@ export function AitrpgConsole() {
       token,
     );
     setRoom(response);
+    window.localStorage.setItem("aitrpg-room-id", response.id);
     setStatus("房间已创建");
   }
 
@@ -174,8 +332,16 @@ export function AitrpgConsole() {
   async function refreshLedger() {
     if (!room) return;
     setStatus("刷新 Story Ledger");
-    const response = await apiFetch(`/rooms/${room.id}/ledger`, {}, token);
+    const response = (await apiFetch(
+      `/rooms/${room.id}/ledger`,
+      {},
+      token,
+    )) as LedgerResponse;
     setLedger(response);
+    const latestJob = response.jobs.at(-1);
+    if (latestJob) {
+      setJobStatus(`${latestJob.type} / ${latestJob.status}`);
+    }
     setStatus("Story Ledger 已刷新");
   }
 
@@ -210,6 +376,9 @@ export function AitrpgConsole() {
     );
     setJobStatus(`${response.type} / ${response.status}`);
     setStatus(`${type} 任务已进入队列`);
+    window.setTimeout(() => {
+      void refreshLedger();
+    }, 200);
   }
 
   return (
@@ -273,6 +442,72 @@ export function AitrpgConsole() {
           >
             创建战役
           </button>
+          <hr className="border-white/8" />
+          <label className="block">
+            <span className="mb-2 block text-[#d8d3c7]">角色名</span>
+            <input
+              className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+              value={characterName}
+              onChange={(event) => setCharacterName(event.target.value)}
+            />
+          </label>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-[#d8d3c7]">种族</span>
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                value={characterAncestry}
+                onChange={(event) => setCharacterAncestry(event.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-[#d8d3c7]">职业</span>
+              <select
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                value={characterClassName}
+                onChange={(event) => setCharacterClassName(event.target.value)}
+              >
+                <option value="WARRIOR">战士</option>
+                <option value="RANGER">游侠</option>
+                <option value="MAGE">法师</option>
+                <option value="CLERIC">牧师</option>
+                <option value="ROGUE">游荡者</option>
+                <option value="BARD">吟游诗人</option>
+              </select>
+            </label>
+          </div>
+          <label className="block">
+            <span className="mb-2 block text-[#d8d3c7]">背景</span>
+            <textarea
+              className="min-h-24 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+              value={characterBackground}
+              onChange={(event) => setCharacterBackground(event.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-[#d8d3c7]">性格</span>
+            <input
+              className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+              value={characterPersonality}
+              onChange={(event) => setCharacterPersonality(event.target.value)}
+            />
+          </label>
+          <div className="flex gap-3">
+            <button
+              className="rounded-full border border-[var(--accent)] px-4 py-2 text-[var(--accent)] disabled:opacity-40"
+              disabled={!campaign}
+              onClick={createCharacter}
+            >
+              创建角色
+            </button>
+            <button
+              className="rounded-full border border-[var(--accent-2)] px-4 py-2 text-[var(--accent-2)] disabled:opacity-40"
+              disabled={!campaign}
+              onClick={refreshCharacters}
+            >
+              刷新角色
+            </button>
+          </div>
         </div>
       </div>
 
@@ -282,7 +517,10 @@ export function AitrpgConsole() {
         </h2>
         <div className="mt-5 space-y-4 text-sm">
           <div className="rounded-2xl border border-white/8 bg-black/15 p-4">
-            <p>系统状态: {system ? `${system.product} / ${system.authMode}` : "加载中"}</p>
+            <p>
+              系统状态:{" "}
+              {system ? `${system.product} / ${system.authMode}` : "加载中"}
+            </p>
             <p className="mt-2">战役: {campaign?.title ?? "未创建"}</p>
             <p className="mt-2">房间: {room?.title ?? "未创建"}</p>
             <p className="mt-2">可见性: {room?.visibility ?? "未设置"}</p>
@@ -295,7 +533,9 @@ export function AitrpgConsole() {
                 className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
                 value={roomVisibility}
                 onChange={(event) =>
-                  setRoomVisibility(event.target.value as "PRIVATE" | "LINK" | "PUBLIC")
+                  setRoomVisibility(
+                    event.target.value as "PRIVATE" | "LINK" | "PUBLIC",
+                  )
                 }
               >
                 <option value="PRIVATE">私有</option>
@@ -316,7 +556,9 @@ export function AitrpgConsole() {
             <input
               type="checkbox"
               checked={spectatorCommentEnabled}
-              onChange={(event) => setSpectatorCommentEnabled(event.target.checked)}
+              onChange={(event) =>
+                setSpectatorCommentEnabled(event.target.checked)
+              }
             />
             开启观众评论流
           </label>
@@ -382,15 +624,87 @@ export function AitrpgConsole() {
             <div className="space-y-3">
               {ledger?.events?.length ? (
                 ledger.events.map((event) => (
-                  <div key={event.id} className="rounded-2xl bg-white/5 px-4 py-3">
+                  <div
+                    key={event.id}
+                    className="rounded-2xl bg-white/5 px-4 py-3"
+                  >
                     <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent)]">
                       {event.type}
                     </div>
-                    <div className="mt-2 leading-7 text-[#ece5d8]">{event.content}</div>
+                    <div className="mt-2 leading-7 text-[#ece5d8]">
+                      {event.content}
+                    </div>
                   </div>
                 ))
               ) : (
                 <div className="text-[#c8c1b5]">还没有加载到事件。</div>
+              )}
+            </div>
+            <div className="mt-4 space-y-3">
+              {ledger?.jobs?.length ? (
+                ledger.jobs.map((job) => (
+                  <div
+                    key={job.id}
+                    className="rounded-2xl bg-white/5 px-4 py-3"
+                  >
+                    <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent-2)]">
+                      {job.type} / {job.status}
+                    </div>
+                    <div className="mt-2 leading-7 text-[#ece5d8]">
+                      {job.title}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-[#c8c1b5]">还没有 afterplay 任务。</div>
+              )}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-black/10 p-4">
+            <p className="mb-3 text-xs uppercase tracking-[0.25em] text-[var(--accent-2)]">
+              Character Forge
+            </p>
+            <div className="space-y-3">
+              {characters.length ? (
+                characters.map((character) => (
+                  <div
+                    key={character.id}
+                    className="grid gap-3 rounded-2xl bg-white/5 p-4 md:grid-cols-[120px_1fr]"
+                  >
+                    <div className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                      {character.portrait ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          alt={`${character.name} portrait`}
+                          className="h-[150px] w-full object-cover"
+                          src={character.portrait.imageUrl}
+                        />
+                      ) : (
+                        <div className="flex h-[150px] items-center justify-center text-xs text-[#c8c1b5]">
+                          无 portrait
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-lg text-[#ece5d8]">
+                        {character.name}
+                      </div>
+                      <div className="text-sm text-[#c8c1b5]">
+                        {character.ancestry} / {character.className}
+                      </div>
+                      <button
+                        className="rounded-full border border-[#f1d7a8] px-4 py-2 text-[#f1d7a8]"
+                        onClick={() => generatePortrait(character)}
+                      >
+                        {character.portrait
+                          ? "重生成 portrait"
+                          : "生成 portrait"}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-[#c8c1b5]">还没有角色。</div>
               )}
             </div>
           </div>
@@ -436,7 +750,10 @@ export function AitrpgConsole() {
             <div className="space-y-3 text-[#ece5d8]">
               {suggestions.length ? (
                 suggestions.map((item) => (
-                  <div key={item} className="rounded-2xl bg-white/5 px-4 py-3 leading-7">
+                  <div
+                    key={item}
+                    className="rounded-2xl bg-white/5 px-4 py-3 leading-7"
+                  >
                     {item}
                   </div>
                 ))

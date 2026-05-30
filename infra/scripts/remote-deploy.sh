@@ -59,6 +59,14 @@ MINIO_API_PORT="${MINIO_API_PORT:-19000}"
 MINIO_CONSOLE_PORT="${MINIO_CONSOLE_PORT:-19001}"
 export API_HOST_PORT WEB_HOST_PORT POSTGRES_HOST_PORT REDIS_HOST_PORT SMTP_HOST_PORT MAILPIT_WEB_PORT MINIO_API_PORT MINIO_CONSOLE_PORT
 
+EMAIL_DELIVERY_MODE="${EMAIL_DELIVERY_MODE:-debug}"
+EMAIL_APP_NAME="${EMAIL_APP_NAME:-AITRPG}"
+EMAIL_FROM="${EMAIL_FROM:-AITRPG <login@${APP_DOMAIN}>}"
+RESEND_API_KEY="${RESEND_API_KEY:-}"
+SMTP_HOST="${SMTP_HOST:-mailpit}"
+SMTP_PORT="${SMTP_PORT:-1025}"
+SMTP_SECURE="${SMTP_SECURE:-false}"
+
 maybe_sudo mkdir -p /var/www/certbot
 maybe_sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 
@@ -81,9 +89,13 @@ DATABASE_URL=postgresql://aitrpg:aitrpg@postgres:5432/aitrpg
 REDIS_URL=redis://redis:6379
 
 JWT_SECRET=${JWT_SECRET}
-EMAIL_FROM=no-reply@${APP_DOMAIN}
-SMTP_HOST=mailpit
-SMTP_PORT=1025
+EMAIL_DELIVERY_MODE=${EMAIL_DELIVERY_MODE}
+EMAIL_APP_NAME=${EMAIL_APP_NAME}
+EMAIL_FROM=${EMAIL_FROM}
+RESEND_API_KEY=${RESEND_API_KEY}
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
+SMTP_SECURE=${SMTP_SECURE}
 SMTP_USER=
 SMTP_PASS=
 
@@ -141,3 +153,5 @@ maybe_sudo systemctl reload nginx
 cd "${DEPLOY_TARGET_DIR}"
 COMPOSE_CMD="$(compose_cmd)"
 $COMPOSE_CMD -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up --build -d
+$COMPOSE_CMD -f infra/docker-compose.yml -f infra/docker-compose.prod.yml exec -T api \
+  pnpm exec prisma db push --schema prisma/schema.prisma

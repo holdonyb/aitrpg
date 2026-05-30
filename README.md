@@ -26,7 +26,8 @@ pnpm install
 pnpm --filter @aitrpg/shared build
 pnpm --filter api test
 pnpm --filter web lint
-pnpm --filter api start:dev
+pnpm --filter api build
+pnpm --filter api start
 pnpm --filter web dev
 ```
 
@@ -84,5 +85,29 @@ The repository currently contains the first implementation slice:
 - product and architecture docs
 - workspace scaffolding
 - shared domain schemas
-- API foundation for auth, campaigns, characters, rooms, ledger, and media jobs
+- PostgreSQL-backed API foundation for auth, campaigns, characters, rooms, sharing, and spectator comments
+- persisted character portrait generation with local SVG portrait assets
+- API foundation for ledger and media jobs
 - web foundation for key product surfaces
+
+## Email Delivery
+
+The login flow supports two modes:
+
+- `EMAIL_DELIVERY_MODE=debug`: the API returns `debugCode` for local development
+- `EMAIL_DELIVERY_MODE=smtp`: the API sends the code through SMTP and does not expose the code in the response
+- `EMAIL_DELIVERY_MODE=resend`: the API sends the code through the Resend Email API and does not expose the code in the response
+
+Recommended setup:
+
+- local development: `Mailpit` or any local SMTP sink
+- production starter tier: `Resend API` or `Brevo SMTP`
+
+Notes:
+
+- Resend API mode requires `RESEND_API_KEY`
+- Resend also requires a valid `EMAIL_FROM` sender, usually from a verified domain
+- For initial testing, Resend documents `onboarding@resend.dev` as the sample sender in their Node.js guide
+- Until you verify a domain in Resend, sandbox delivery is limited to the account owner email
+- Production setup should switch `EMAIL_FROM` to a sender on your verified domain, for example `AITRPG <login@aitrpg.ifix.xin>`
+- This deployment is configured for the verified sender domain `aitrpg.ifix.xin`
