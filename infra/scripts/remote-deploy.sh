@@ -27,6 +27,45 @@ compose_cmd() {
   fi
 }
 
+log_host_resources() {
+  echo "=== host resources ==="
+  free -h || true
+  echo "---"
+  df -h / /var/lib/docker || true
+}
+
+run_db_push_with_retry() {
+  local compose_cmd="$1"
+  local max_attempts="${2:-5}"
+  local attempt
+  local exit_code
+
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    echo "Running prisma db push (attempt ${attempt}/${max_attempts})"
+    set +e
+    $compose_cmd -f infra/docker-compose.yml -f infra/docker-compose.prod.yml exec -T api \
+      pnpm --filter api exec prisma db push --skip-generate --schema prisma/schema.prisma
+    exit_code=$?
+    set -e
+
+    if [[ "${exit_code}" -eq 0 ]]; then
+      return 0
+    fi
+
+    echo "prisma db push failed with exit code ${exit_code}"
+    log_host_resources
+    $compose_cmd -f infra/docker-compose.yml -f infra/docker-compose.prod.yml ps || true
+    $compose_cmd -f infra/docker-compose.yml -f infra/docker-compose.prod.yml logs --tail=80 api || true
+
+    if [[ "${attempt}" -lt "${max_attempts}" ]]; then
+      echo "Waiting before retry"
+      sleep $((attempt * 15))
+    fi
+  done
+
+  return "${exit_code}"
+}
+
 maybe_sudo() {
   if [[ "${EUID}" -eq 0 ]]; then
     "$@"
@@ -152,6 +191,8 @@ maybe_sudo systemctl reload nginx
 
 cd "${DEPLOY_TARGET_DIR}"
 COMPOSE_CMD="$(compose_cmd)"
+log_host_resources
 $COMPOSE_CMD -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up --build -d
-$COMPOSE_CMD -f infra/docker-compose.yml -f infra/docker-compose.prod.yml exec -T api \
-  pnpm --filter api exec prisma db push --skip-generate --schema prisma/schema.prisma
+echo "Waiting for containers to settle before schema sync"
+sleep 20
+run_db_push_with_retry "${COMPOSE_CMD}" 5
