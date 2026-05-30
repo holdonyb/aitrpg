@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   mediaJobInputSchema,
   roomInputSchema,
@@ -6,146 +12,582 @@ import {
   shareLinkInputSchema,
   spectatorCommentInputSchema,
   storyEventInputSchema,
-} from "@aitrpg/shared";
-import { randomUUID } from "crypto";
+} from '@aitrpg/shared';
+import { createHash, randomUUID } from 'crypto';
+import jwt from 'jsonwebtoken';
 
-import { MemoryStoreService } from "../store/memory-store.service";
+import { MediaJobsService } from '../media-jobs/media-jobs.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { isPrimaryStoreUnavailable } from '../store/fallback';
+import { MemoryStoreService } from '../store/memory-store.service';
 
 @Injectable()
 export class RoomsService {
-  constructor(private readonly store: MemoryStoreService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+    private readonly mediaJobsService: MediaJobsService,
+    private readonly memoryStore: MemoryStoreService,
+  ) {}
 
-  createRoom(userId: string, body: unknown) {
+  async createRoom(userId: string, body: unknown) {
     const input = roomInputSchema.parse(body);
-    const room = this.store.createRoom({
-      ...input,
-      createdBy: userId,
-      status: "READY",
-    });
+    await this.ensureCampaignOwner(userId, input.campaignId);
+
+    const room = await this.withFallback(
+      () =>
+        this.prisma.room.create({
+          data: {
+            campaignId: input.campaignId,
+            title: input.title,
+            description: input.description,
+            status: 'READY',
+            createdBy: userId,
+            visibility: input.visibility,
+            passwordHash: input.password
+              ? this.hashSecret(input.password)
+              : undefined,
+            spectatorCommentEnabled: input.spectatorCommentEnabled,
+          },
+        }),
+      () =>
+        this.memoryStore.createRoom({
+          campaignId: input.campaignId,
+          title: input.title,
+          description: input.description,
+          status: 'READY',
+          createdBy: userId,
+          visibility: input.visibility,
+          password: input.password,
+          spectatorCommentEnabled: input.spectatorCommentEnabled,
+        }) as any,
+    );
 
     return this.sanitizeRoom(room);
   }
 
-  getLedger(roomId: string) {
-    this.ensureRoom(roomId);
+  async getLedger(userId: string, roomId: string) {
+    await this.ensureDmRoom(userId, roomId);
+
+    const [events, jobs] = await this.withFallback(
+      () =>
+        Promise.all([
+          this.prisma.storyEvent.findMany({
+            where: { roomId },
+            orderBy: { createdAt: 'asc' },
+          }),
+          this.prisma.mediaJob.findMany({
+            where: { roomId },
+            orderBy: { createdAt: 'asc' },
+          }),
+        ]),
+      () =>
+        Promise.resolve([
+          this.memoryStore.listEvents(roomId),
+          this.memoryStore.listMediaJobs(roomId),
+        ]) as any,
+    );
+
     return {
       roomId,
-      events: this.store.listEvents(roomId),
-      jobs: this.store.listMediaJobs(roomId),
+      events,
+      jobs,
     };
   }
 
-  addEvent(body: unknown) {
-    const input = storyEventInputSchema.parse(body);
-    this.ensureRoom(input.roomId);
-    return this.store.addEvent(input);
+  async listRooms(userId: string, campaignId?: string) {
+    const rooms = (await this.withFallback(
+      () =>
+        this.prisma.room.findMany({
+          where: {
+            createdBy: userId,
+            ...(campaignId ? { campaignId } : {}),
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+      () => this.memoryStore.listRooms(userId, campaignId) as any,
+    )) as Array<{
+      id: string;
+      campaignId: string;
+      title: string;
+      description: string;
+      status: string;
+      createdBy: string;
+      visibility: string;
+      spectatorCommentEnabled: boolean;
+      createdAt: Date | string;
+    }>;
+
+    return rooms.map((room) => this.sanitizeRoom(room));
   }
 
-  getSuggestions(roomId: string) {
-    this.ensureRoom(roomId);
-    const recent = this.store.listEvents(roomId).slice(-3);
-    const lastContent = recent.at(-1)?.content ?? "新的场景正在展开。";
+  async getRoom(userId: string, roomId: string) {
+    const room = await this.ensureRoom(roomId);
+    if (room.createdBy !== userId) {
+      throw new ForbiddenException('Only the DM can inspect this room');
+    }
+
+    return this.sanitizeRoom(room);
+  }
+
+  async addEvent(userId: string, body: unknown) {
+    const input = storyEventInputSchema.parse(body);
+    await this.ensureDmRoom(userId, input.roomId);
+
+    return this.withFallback(
+      () =>
+        this.prisma.storyEvent.create({
+          data: input,
+        }),
+      () => this.memoryStore.addEvent(input) as any,
+    );
+  }
+
+  async getSuggestions(userId: string, roomId: string) {
+    await this.ensureDmRoom(userId, roomId);
+
+    const recent = await this.withFallback(
+      () =>
+        this.prisma.storyEvent.findMany({
+          where: { roomId },
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+        }),
+      () => this.memoryStore.listEvents(roomId).slice(-3).reverse() as any,
+    );
+    const lastContent = recent.at(0)?.content ?? '新的场景正在展开。';
 
     return {
       roomId,
       suggestions: [
         `旁白建议：${lastContent} 之后，环境细节可以进一步压迫队伍情绪。`,
-        "NPC 建议：让营地外的斥候带回一条真假难辨的坏消息。",
-        "推进建议：给 DM 一个需要立刻裁定的选择节点。",
+        'NPC 建议：让营地外的斥候带回一条真假难辨的坏消息。',
+        '推进建议：给 DM 一个需要立刻裁定的选择节点。',
       ],
     };
   }
 
-  createMediaJob(roomId: string, body: Record<string, unknown>) {
+  async createMediaJob(
+    userId: string,
+    roomId: string,
+    body: Record<string, unknown>,
+  ) {
     const input = mediaJobInputSchema.parse({
       ...body,
       roomId,
     });
-    this.ensureRoom(roomId);
-    return this.store.addMediaJob(input);
+    await this.ensureDmRoom(userId, roomId);
+
+    const job = await this.withFallback(
+      () =>
+        this.prisma.mediaJob.create({
+          data: {
+            roomId: input.roomId,
+            type: input.type,
+            title: input.title,
+            prompt: input.prompt,
+            status: 'queued',
+          },
+        }),
+      () =>
+        this.memoryStore.addMediaJob({
+          roomId: input.roomId,
+          type: input.type,
+          title: input.title,
+          prompt: input.prompt,
+        }) as any,
+    );
+
+    this.mediaJobsService.enqueue(job.id);
+
+    return job;
   }
 
-  createShareLink(userId: string, roomId: string, body: unknown) {
+  async createShareLink(userId: string, roomId: string, body: unknown) {
     const input = shareLinkInputSchema.parse(body);
-    const room = this.ensureRoom(roomId);
+    const room = await this.ensureRoom(roomId);
     if (room.createdBy !== userId) {
-      throw new ForbiddenException("Only the DM can create a share link");
+      throw new ForbiddenException('Only the DM can create a share link');
     }
 
-    return this.store.createShareLink({
-      targetType: input.targetType,
-      targetId: roomId,
-      token: randomUUID().replaceAll("-", ""),
-      createdBy: userId,
-    });
+    return this.withFallback(
+      async () => {
+        const existing = await this.prisma.shareLink.findFirst({
+          where: {
+            targetType: input.targetType,
+            targetId: roomId,
+            revokedAt: null,
+          },
+        });
+
+        if (existing) {
+          return existing;
+        }
+
+        return this.prisma.shareLink.create({
+          data: {
+            targetType: input.targetType,
+            targetId: roomId,
+            token: randomUUID().replaceAll('-', ''),
+            createdBy: userId,
+          },
+        });
+      },
+      () =>
+        this.memoryStore.createShareLink({
+          targetType: input.targetType,
+          targetId: roomId,
+          token: randomUUID().replaceAll('-', ''),
+          createdBy: userId,
+        }) as any,
+    );
   }
 
-  getSharedRoom(token: string) {
-    const shareLink = this.ensureRoomShareLink(token);
-    const room = this.ensureRoom(shareLink.targetId);
+  async createArtifactShareLink(
+    userId: string,
+    artifactId: string,
+    body: unknown,
+  ) {
+    const input = shareLinkInputSchema.parse(body);
+    const artifact = await this.withFallback(
+      () =>
+        this.prisma.mediaJob.findUnique({
+          where: { id: artifactId },
+          include: {
+            room: true,
+          },
+        }),
+      () => {
+        const job = this.memoryStore.getMediaJob(artifactId);
+        if (!job) {
+          return null;
+        }
+
+        const room = this.memoryStore.getRoom(job.roomId);
+        if (!room) {
+          return null;
+        }
+
+        return { ...job, room } as any;
+      },
+    );
+
+    if (!artifact) {
+      throw new NotFoundException('Artifact not found');
+    }
+
+    if (artifact.room.createdBy !== userId) {
+      throw new ForbiddenException('Only the DM can share this artifact');
+    }
+
+    return this.withFallback(
+      async () => {
+        const existing = await this.prisma.shareLink.findFirst({
+          where: {
+            targetType: input.targetType,
+            targetId: artifactId,
+            revokedAt: null,
+          },
+        });
+
+        if (existing) {
+          return existing;
+        }
+
+        return this.prisma.shareLink.create({
+          data: {
+            targetType: input.targetType,
+            targetId: artifactId,
+            token: randomUUID().replaceAll('-', ''),
+            createdBy: userId,
+          },
+        });
+      },
+      () =>
+        this.memoryStore.createShareLink({
+          targetType: input.targetType,
+          targetId: artifactId,
+          token: randomUUID().replaceAll('-', ''),
+          createdBy: userId,
+        }) as any,
+    );
+  }
+
+  async getSharedRoom(token: string, accessToken?: string) {
+    const shareLink = await this.ensureRoomShareLink(token);
+    const room = await this.ensureRoom(shareLink.targetId);
+    const hasAccess = this.hasRoomShareAccess(
+      room.passwordHash,
+      token,
+      accessToken,
+    );
+    const events = hasAccess
+      ? await this.withFallback(
+          () =>
+            this.prisma.storyEvent.findMany({
+              where: { roomId: room.id },
+              orderBy: { createdAt: 'asc' },
+            }),
+          () => this.memoryStore.listEvents(room.id) as any,
+        )
+      : [];
 
     return {
       share: {
         token: shareLink.token,
         targetType: shareLink.targetType,
       },
-      room: {
-        ...this.sanitizeRoom(room),
-      },
+      room: this.sanitizeRoom(room),
       requiresPassword: Boolean(room.passwordHash),
-      events: this.store.listEvents(room.id),
+      accessGranted: hasAccess,
+      events,
     };
   }
 
-  accessSharedRoom(token: string, body: unknown) {
+  async accessSharedRoom(token: string, body: unknown) {
     const input = shareAccessInputSchema.parse(body);
-    const shareLink = this.ensureRoomShareLink(token);
-    const room = this.ensureRoom(shareLink.targetId);
+    const shareLink = await this.ensureRoomShareLink(token);
+    const room = await this.ensureRoom(shareLink.targetId);
 
-    if (!this.store.verifyRoomPassword(room, input.password)) {
-      throw new UnauthorizedException("Invalid room password");
+    if (!this.verifyRoomPassword(room.passwordHash, input.password)) {
+      throw new UnauthorizedException('Invalid room password');
     }
 
-    return this.store.grantShareAccess(token);
+    return {
+      ok: true,
+      accessToken: this.issueRoomShareAccessToken(token),
+    };
   }
 
-  listSpectatorComments(token: string) {
-    const shareLink = this.ensureRoomShareLink(token);
-    const room = this.ensureRoom(shareLink.targetId);
+  async getSharedArtifact(token: string) {
+    const shareLink = await this.ensureArtifactShareLink(token);
+    const artifact = await this.withFallback(
+      () =>
+        this.prisma.mediaJob.findUnique({
+          where: { id: shareLink.targetId },
+        }),
+      () => (this.memoryStore.getMediaJob(shareLink.targetId) ?? null) as any,
+    );
+
+    if (!artifact) {
+      throw new NotFoundException('Artifact not found');
+    }
+
+    return {
+      share: {
+        token: shareLink.token,
+        targetType: shareLink.targetType,
+      },
+      artifact: {
+        id: artifact.id,
+        roomId: artifact.roomId,
+        type: artifact.type,
+        title: artifact.title,
+        prompt: artifact.prompt,
+        status: artifact.status,
+        createdAt: artifact.createdAt,
+      },
+    };
+  }
+
+  async listSpectatorComments(token: string, accessToken?: string) {
+    const shareLink = await this.ensureRoomShareLink(token);
+    const room = await this.ensureRoom(shareLink.targetId);
+
+    if (!this.hasRoomShareAccess(room.passwordHash, token, accessToken)) {
+      throw new UnauthorizedException('Share access required');
+    }
+
+    const comments = await this.withFallback(
+      () =>
+        this.prisma.spectatorComment.findMany({
+          where: { roomId: room.id },
+          orderBy: { createdAt: 'asc' },
+        }),
+      () => this.memoryStore.listSpectatorComments(room.id) as any,
+    );
 
     return {
       roomId: room.id,
-      comments: this.store.listSpectatorComments(room.id),
+      comments,
     };
   }
 
-  createSpectatorComment(token: string, userId: string, userDisplayName: string, body: unknown) {
+  async createSpectatorComment(
+    token: string,
+    userId: string,
+    userDisplayName: string,
+    accessToken: string | undefined,
+    body: unknown,
+  ) {
     const input = spectatorCommentInputSchema.parse(body);
-    const shareLink = this.ensureRoomShareLink(token);
-    const room = this.ensureRoom(shareLink.targetId);
+    const shareLink = await this.ensureRoomShareLink(token);
+    const room = await this.ensureRoom(shareLink.targetId);
 
-    if (!room.spectatorCommentEnabled) {
-      throw new ForbiddenException("Spectator comments are disabled");
+    if (!this.hasRoomShareAccess(room.passwordHash, token, accessToken)) {
+      throw new UnauthorizedException('Share access required');
     }
 
-    return this.store.addSpectatorComment(room.id, userId, userDisplayName, input.content);
+    if (!room.spectatorCommentEnabled) {
+      throw new ForbiddenException('Spectator comments are disabled');
+    }
+
+    return this.withFallback(
+      () =>
+        this.prisma.spectatorComment.create({
+          data: {
+            roomId: room.id,
+            userId,
+            userDisplayName,
+            content: input.content,
+          },
+        }),
+      () =>
+        this.memoryStore.addSpectatorComment(
+          room.id,
+          userId,
+          userDisplayName,
+          input.content,
+        ) as any,
+    );
   }
 
-  private ensureRoom(roomId: string) {
-    const room = this.store.getRoom(roomId);
+  private async ensureRoom(roomId: string) {
+    const room = await this.withFallback(
+      () =>
+        this.prisma.room.findUnique({
+          where: { id: roomId },
+        }),
+      () => this.memoryStore.getRoom(roomId) as any,
+    );
     if (!room) {
-      throw new NotFoundException("Room not found");
+      throw new NotFoundException('Room not found');
     }
     return room;
   }
 
-  private ensureRoomShareLink(token: string) {
-    const shareLink = this.store.getShareLink(token);
-    if (!shareLink || shareLink.targetType !== "ROOM" || shareLink.revokedAt) {
-      throw new NotFoundException("Share link not found");
+  private async ensureDmRoom(userId: string, roomId: string) {
+    const room = await this.ensureRoom(roomId);
+    if (room.createdBy !== userId) {
+      throw new ForbiddenException('Only the DM can update this room');
+    }
+
+    return room;
+  }
+
+  private async ensureCampaignOwner(userId: string, campaignId: string) {
+    const campaign = await this.withFallback(
+      () =>
+        this.prisma.campaign.findUnique({
+          where: { id: campaignId },
+        }),
+      () => this.memoryStore.getCampaign(campaignId) as any,
+    );
+
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+
+    if (campaign.ownerId !== userId) {
+      throw new ForbiddenException('Only the campaign DM can create rooms');
+    }
+  }
+
+  private async ensureRoomShareLink(token: string) {
+    const shareLink = await this.withFallback(
+      () =>
+        this.prisma.shareLink.findUnique({
+          where: { token },
+        }),
+      () => this.memoryStore.getShareLink(token) as any,
+    );
+    if (!shareLink || shareLink.targetType !== 'ROOM' || shareLink.revokedAt) {
+      throw new NotFoundException('Share link not found');
     }
 
     return shareLink;
+  }
+
+  private async ensureArtifactShareLink(token: string) {
+    const shareLink = await this.withFallback(
+      () =>
+        this.prisma.shareLink.findUnique({
+          where: { token },
+        }),
+      () => this.memoryStore.getShareLink(token) as any,
+    );
+
+    if (
+      !shareLink ||
+      shareLink.targetType !== 'ARTIFACT' ||
+      shareLink.revokedAt
+    ) {
+      throw new NotFoundException('Share link not found');
+    }
+
+    return shareLink;
+  }
+
+  private hashSecret(value: string) {
+    return createHash('sha256').update(value).digest('hex');
+  }
+
+  private verifyRoomPassword(passwordHash: string | null, password?: string) {
+    if (!passwordHash) {
+      return true;
+    }
+
+    if (!password) {
+      return false;
+    }
+
+    return this.hashSecret(password) === passwordHash;
+  }
+
+  private issueRoomShareAccessToken(shareToken: string) {
+    const secret =
+      this.configService.get<string>('JWT_SECRET') || 'aitrpg-dev-secret';
+
+    return jwt.sign(
+      {
+        purpose: 'room-share-access',
+        shareToken,
+      },
+      secret,
+      {
+        expiresIn: '12h',
+      },
+    );
+  }
+
+  private hasRoomShareAccess(
+    passwordHash: string | null,
+    shareToken: string,
+    accessToken?: string,
+  ) {
+    if (!passwordHash) {
+      return true;
+    }
+
+    if (!accessToken) {
+      return false;
+    }
+
+    try {
+      const secret =
+        this.configService.get<string>('JWT_SECRET') || 'aitrpg-dev-secret';
+      const payload = jwt.verify(accessToken, secret) as {
+        purpose?: string;
+        shareToken?: string;
+      };
+
+      return (
+        payload.purpose === 'room-share-access' &&
+        payload.shareToken === shareToken
+      );
+    } catch {
+      return false;
+    }
   }
 
   private sanitizeRoom(room: {
@@ -155,9 +597,9 @@ export class RoomsService {
     description: string;
     status: string;
     createdBy: string;
-    visibility: "PRIVATE" | "LINK" | "PUBLIC";
+    visibility: string;
     spectatorCommentEnabled: boolean;
-    createdAt: string;
+    createdAt: Date | string;
   }) {
     return {
       id: room.id,
@@ -170,5 +612,37 @@ export class RoomsService {
       spectatorCommentEnabled: room.spectatorCommentEnabled,
       createdAt: room.createdAt,
     };
+  }
+
+  private async withFallback<T>(
+    primary: () => Promise<T>,
+    fallback: () => T | Promise<T>,
+  ) {
+    if (this.configService.get<string>('DATA_STORE_MODE') === 'file') {
+      return fallback();
+    }
+
+    try {
+      return await Promise.race([
+        primary(),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Primary store timeout')), 1500);
+        }),
+      ]);
+    } catch (error) {
+      if (
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+
+      if (isPrimaryStoreUnavailable(error)) {
+        return fallback();
+      }
+
+      throw error;
+    }
   }
 }

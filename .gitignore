@@ -4,6 +4,7 @@ coverage
 node_modules
 .pnpm-store
 .runtime
+.playwright-cli
 .turbo
 *.log
 .env
@@ -11,7 +12,7 @@ node_modules
 .env.production
 apps/*/.next
 apps/*/node_modules
+apps/api/src/generated
 packages/*/node_modules
 apps/api/prisma/migrations
 apps/api/prisma/dev.db
-

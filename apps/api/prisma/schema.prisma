@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -8,10 +9,14 @@ datasource db {
 }
 
 model User {
-  id          String     @id @default(uuid())
-  email       String     @unique
-  displayName String
-  campaigns   Campaign[]
+  id                String               @id @default(uuid())
+  email             String               @unique
+  displayName       String
+  campaigns         Campaign[]
+  spectatorComments SpectatorComment[]
+  shareLinks        ShareLink[]          @relation("ShareLinkCreator")
+  emailCodes        EmailCodeChallenge[]
+  createdAt         DateTime             @default(now())
 }
 
 model Campaign {
@@ -28,34 +33,39 @@ model Campaign {
 }
 
 model Character {
-  id           String   @id @default(uuid())
-  campaignId   String
-  campaign     Campaign @relation(fields: [campaignId], references: [id])
-  name         String
-  ancestry     String
-  className    String
-  background   String
-  personality  String
-  controlledBy String
+  id             String         @id @default(uuid())
+  campaignId     String
+  campaign       Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name           String
+  ancestry       String
+  className      String
+  background     String
+  personality    String
+  controlledBy   String
+  portraitAssets PortraitAsset[]
 }
 
 model Room {
-  id          String       @id @default(uuid())
-  campaignId  String
-  campaign    Campaign     @relation(fields: [campaignId], references: [id])
-  title       String
-  description String
-  status      String
-  createdBy   String
-  events      StoryEvent[]
-  mediaJobs   MediaJob[]
-  createdAt   DateTime     @default(now())
+  id                      String             @id @default(uuid())
+  campaignId              String
+  campaign                Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title                   String
+  description             String
+  status                  String
+  createdBy               String
+  visibility              String             @default("PRIVATE")
+  passwordHash            String?
+  spectatorCommentEnabled Boolean            @default(false)
+  events                  StoryEvent[]
+  mediaJobs               MediaJob[]
+  spectatorComments       SpectatorComment[]
+  createdAt               DateTime           @default(now())
 }
 
 model StoryEvent {
   id          String   @id @default(uuid())
   roomId      String
-  room        Room     @relation(fields: [roomId], references: [id])
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   characterId String?
   type        String
   content     String
@@ -64,11 +74,57 @@ model StoryEvent {
 
 model MediaJob {
   id        String   @id @default(uuid())
-  roomId     String
-  room       Room     @relation(fields: [roomId], references: [id])
-  type       String
-  title      String
-  prompt     String
-  status     String
-  createdAt  DateTime @default(now())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  prompt    String
+  status    String
+  createdAt DateTime @default(now())
+}
+
+model PortraitAsset {
+  id          String    @id @default(uuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  prompt      String
+  imageUrl    String
+  status      String    @default("succeeded")
+  createdAt   DateTime  @default(now())
+}
+
+model ShareLink {
+  id        String   @id @default(uuid())
+  targetType String
+  targetId  String
+  token     String   @unique
+  createdBy String
+  creator   User     @relation("ShareLinkCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([targetType, targetId])
+}
+
+model SpectatorComment {
+  id              String   @id @default(uuid())
+  roomId          String
+  room            Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userDisplayName String
+  content         String
+  createdAt       DateTime @default(now())
+}
+
+model EmailCodeChallenge {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }

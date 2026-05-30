@@ -29,6 +29,9 @@ jobs:
       - name: Build shared
         run: pnpm --filter @aitrpg/shared build
 
+      - name: Generate Prisma client
+        run: pnpm --filter api prisma:generate
+
       - name: Build API
         run: pnpm --filter api build
 
@@ -75,6 +78,10 @@ jobs:
           export OPENAI_IMAGE_MODEL="${{ secrets.OPENAI_IMAGE_MODEL }}"
           export OPENAI_VIDEO_MODEL="${{ secrets.OPENAI_VIDEO_MODEL }}"
           export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          export EMAIL_DELIVERY_MODE="${{ secrets.EMAIL_DELIVERY_MODE }}"
+          export EMAIL_APP_NAME="${{ secrets.EMAIL_APP_NAME }}"
+          export EMAIL_FROM="${{ secrets.EMAIL_FROM }}"
+          export RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}"
           cd "${{ secrets.DEPLOY_TARGET_DIR }}"
           chmod +x infra/scripts/remote-deploy.sh
           ./infra/scripts/remote-deploy.sh
