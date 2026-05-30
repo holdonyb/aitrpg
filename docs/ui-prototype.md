@@ -27,7 +27,7 @@
 
 - structured character sheet form
 - portrait preview card
-- portrait generation job state
+- portrait preview card persists after refresh and restart
 
 ### Live session room
 

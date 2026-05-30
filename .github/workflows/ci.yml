@@ -9,6 +9,20 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aitrpg
+          POSTGRES_PASSWORD: aitrpg
+          POSTGRES_DB: aitrpg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aitrpg -d aitrpg"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -28,13 +42,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm --filter api prisma:generate
+
+      - name: Push Prisma schema
+        env:
+          DATABASE_URL: postgresql://aitrpg:aitrpg@127.0.0.1:5432/aitrpg
+        run: pnpm --filter api exec prisma db push --schema prisma/schema.prisma
+
       - name: Shared tests
         run: pnpm --filter @aitrpg/shared test
 
       - name: API unit tests
+        env:
+          DATABASE_URL: postgresql://aitrpg:aitrpg@127.0.0.1:5432/aitrpg
         run: pnpm --filter api test
 
       - name: API e2e tests
+        env:
+          DATABASE_URL: postgresql://aitrpg:aitrpg@127.0.0.1:5432/aitrpg
         run: pnpm --filter api test:e2e
 
       - name: Web lint

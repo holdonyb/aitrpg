@@ -25,7 +25,7 @@ flowchart LR
 
 - `auth`: email code challenge and JWT session issue
 - `campaigns`: campaign lifecycle and DM ownership
-- `characters`: player characters, AI party members, portrait assets
+- `characters`: player characters, AI party members, persisted portrait assets
 - `rooms`: session state, room participants, live event submission
 - `sharing`: room share links, password checks, and spectator access
 - `spectators`: spectator comments and moderation-safe read-only viewing
