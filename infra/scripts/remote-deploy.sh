@@ -66,6 +66,12 @@ run_db_push_with_retry() {
   return "${exit_code}"
 }
 
+compose_stack() {
+  local compose_cmd="$1"
+  shift
+  $compose_cmd -f infra/docker-compose.yml -f infra/docker-compose.prod.yml "$@"
+}
+
 maybe_sudo() {
   if [[ "${EUID}" -eq 0 ]]; then
     "$@"
@@ -192,7 +198,9 @@ maybe_sudo systemctl reload nginx
 cd "${DEPLOY_TARGET_DIR}"
 COMPOSE_CMD="$(compose_cmd)"
 log_host_resources
-$COMPOSE_CMD -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up --build -d
-echo "Waiting for containers to settle before schema sync"
-sleep 20
+compose_stack "${COMPOSE_CMD}" build api web
+compose_stack "${COMPOSE_CMD}" up -d postgres redis mailpit minio
+echo "Waiting for infrastructure services before schema sync"
+sleep 10
 run_db_push_with_retry "${COMPOSE_CMD}" 5
+compose_stack "${COMPOSE_CMD}" up -d api web
