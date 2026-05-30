@@ -154,4 +154,4 @@ cd "${DEPLOY_TARGET_DIR}"
 COMPOSE_CMD="$(compose_cmd)"
 $COMPOSE_CMD -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up --build -d
 $COMPOSE_CMD -f infra/docker-compose.yml -f infra/docker-compose.prod.yml exec -T api \
-  pnpm --filter api exec prisma db push --schema prisma/schema.prisma
+  pnpm --filter api exec prisma db push --skip-generate --schema prisma/schema.prisma
