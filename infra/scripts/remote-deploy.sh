@@ -43,7 +43,7 @@ run_db_push_with_retry() {
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     echo "Running prisma db push (attempt ${attempt}/${max_attempts})"
     set +e
-    $compose_cmd -f infra/docker-compose.yml -f infra/docker-compose.prod.yml exec -T api \
+    $compose_cmd -f infra/docker-compose.yml -f infra/docker-compose.prod.yml run --rm -T --no-deps api \
       pnpm --filter api exec prisma db push --skip-generate --schema prisma/schema.prisma
     exit_code=$?
     set -e
