@@ -22,7 +22,7 @@ export function SharedArtifactView({ token }: { token: string }) {
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-8 lg:px-10">
       <section className="border border-[var(--panel-border)] bg-[var(--panel)] p-8">
         <p className="text-sm uppercase tracking-[0.3em] text-[var(--accent-2)]">
-          AITRPG / Shared Artifact
+          AITRPG
         </p>
         <h1 className="mt-4 font-[family-name:var(--font-display)] text-5xl leading-none">
           {payload?.artifact.title ?? "会后产物"}
@@ -45,16 +45,16 @@ export function SharedArtifactView({ token }: { token: string }) {
 
         <div className="border border-[var(--panel-border)] bg-[var(--panel)] p-6">
           <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
-            生成提示
+            内容摘要
           </h2>
           <div className="mt-5 border border-white/8 bg-black/10 px-4 py-4 text-sm leading-7 text-[#ece5d8]">
             {payload?.artifact.prompt ?? "正在加载提示内容。"}
           </div>
           <div className="mt-5 text-sm text-[#c8c1b5]">
-            这一页当前展示的是 afterplay 产物元数据和生成提示，后续会接真实图像、小说正文和视频资源。
+            这里会展示这次冒险留下来的创作结果与关键信息。
           </div>
           <Link className="mt-5 inline-block underline underline-offset-4" href="/">
-            返回工作台
+            返回首页
           </Link>
         </div>
       </section>
