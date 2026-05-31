@@ -82,11 +82,11 @@ export function SharedRoomView({ token }: { token: string }) {
   }, [shareAccessToken, token]);
 
   useEffect(() => {
-    if (!ready || !authedToken) {
+    if (!ready || !authedToken || !room) {
       return;
     }
 
-    if (room?.requiresPassword && !room.accessGranted) {
+    if (room.requiresPassword && !room.accessGranted) {
       return;
     }
 
