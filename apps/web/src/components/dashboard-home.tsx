@@ -67,8 +67,10 @@ export function DashboardHome() {
         body: JSON.stringify({ email }),
       },
     );
-    setCode(response.debugCode);
-    setStatus("验证码已生成，开发环境会直接回填");
+    if (response.debugCode) {
+      setCode(response.debugCode);
+    }
+    setStatus("验证码已发送");
   }
 
   async function verifyCode() {
@@ -110,31 +112,25 @@ export function DashboardHome() {
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="border border-[var(--panel-border)] bg-[var(--panel)] p-8">
           <p className="text-sm uppercase tracking-[0.3em] text-[var(--accent-2)]">
-            AITRPG / Command Deck
+            AITRPG
           </p>
           <h1 className="mt-4 font-[family-name:var(--font-display)] text-5xl leading-none text-[var(--foreground)]">
-            登录、建团，然后进入正式工作台。
+            开一场冒险，让故事留下来。
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-8 text-[#d6d1c5]">
-            这一版把单页控制台拆成三段：首页负责登录和战役列表，战役页负责角色与房间，
-            房间页负责 Story Ledger、Co-DM 和 afterplay。
+            创建战役、组织队伍、推进剧情，再把这一夜的故事整理成插画、小说和可分享的记录。
           </p>
         </div>
 
         <div className="border border-[var(--panel-border)] bg-[rgba(15,18,23,0.88)] p-6">
           <p className="text-sm uppercase tracking-[0.25em] text-[var(--accent)]">
-            系统状态
+            当前概览
           </p>
           <div className="mt-4 space-y-3 text-sm text-[#d8d3c7]">
             <p>产品: {system?.product ?? "加载中"}</p>
-            <p>鉴权: {system?.authMode ?? "加载中"}</p>
-            <p>房间面: {system?.roomSurface ?? "加载中"}</p>
+            <p>登录方式: {system?.authMode ?? "加载中"}</p>
+            <p>体验形态: {system?.roomSurface ?? "加载中"}</p>
             <p>当前状态: {status}</p>
-            {authenticated ? (
-              <Link className="inline-block underline underline-offset-4" href="/admin">
-                进入后台
-              </Link>
-            ) : null}
           </div>
         </div>
       </section>
@@ -187,7 +183,7 @@ export function DashboardHome() {
 
         <div className="border border-[var(--panel-border)] bg-[rgba(15,18,23,0.88)] p-6">
           <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
-            战役工作台
+            我的战役
           </h2>
           <div className="mt-5 grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
             <div className="space-y-4 text-sm">
@@ -238,7 +234,7 @@ export function DashboardHome() {
                 ))
               ) : (
                 <div className="border border-white/8 bg-black/10 px-4 py-4 text-sm text-[#c8c1b5]">
-                  登录后创建第一个战役。
+                  还没有战役，先创建一场冒险。
                 </div>
               )}
             </div>

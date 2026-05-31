@@ -16,7 +16,7 @@ const displayFont = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: "AITRPG",
-  description: "AI 协作跑团工作台",
+  description: "AI 协作跑团平台",
 };
 
 export default function RootLayout({

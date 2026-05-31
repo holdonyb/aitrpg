@@ -150,7 +150,7 @@ export function SharedRoomView({ token }: { token: string }) {
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="border border-[var(--panel-border)] bg-[var(--panel)] p-8">
           <p className="text-sm uppercase tracking-[0.3em] text-[var(--accent-2)]">
-            AITRPG / Live Spectator
+            AITRPG
           </p>
           <h1 className="mt-4 font-[family-name:var(--font-display)] text-5xl leading-none text-[var(--foreground)]">
             {room?.room.title ?? "观战房间"}
@@ -183,12 +183,12 @@ export function SharedRoomView({ token }: { token: string }) {
                   className="w-full bg-[var(--accent)] px-4 py-3 text-left text-black"
                   onClick={unlockRoom}
                 >
-                  输入密码进入
+                  进入观战
                 </button>
               </>
             ) : null}
             <Link className="block text-[#d8d3c7] underline underline-offset-4" href="/">
-              返回主工作台登录或开团
+              返回首页
             </Link>
           </div>
         </div>
@@ -197,7 +197,7 @@ export function SharedRoomView({ token }: { token: string }) {
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="border border-[var(--panel-border)] bg-[var(--panel)] p-6">
           <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
-            主跑团时间线
+            剧情记录
           </h2>
           <div className="mt-5 space-y-3 text-sm">
             {room?.events.length ? (
@@ -212,8 +212,8 @@ export function SharedRoomView({ token }: { token: string }) {
             ) : (
               <div className="text-[#c8c1b5]">
                 {room?.requiresPassword && !room?.accessGranted
-                  ? "需要先通过观战密码验证，主时间线才会显示。"
-                  : "主时间线还没有事件。"}
+                  ? "通过访问验证后，这里的剧情记录才会显示。"
+                  : "这里还没有新的剧情记录。"}
               </div>
             )}
           </div>
@@ -221,14 +221,14 @@ export function SharedRoomView({ token }: { token: string }) {
 
         <div className="border border-[var(--panel-border)] bg-[rgba(15,18,23,0.88)] p-6">
           <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
-            观众评论流
+            观众留言
           </h2>
           <div className="mt-5 space-y-4 text-sm">
             <textarea
               className="min-h-28 w-full border border-white/10 bg-black/20 px-4 py-3 outline-none"
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              placeholder="登录后可评论，不会写入主剧情时间线。"
+              placeholder="登录后可以留言，留言不会影响房间里的正式剧情。"
             />
             <button
               className="w-full bg-[var(--accent-2)] px-4 py-3 text-left text-black disabled:opacity-40"
@@ -252,7 +252,7 @@ export function SharedRoomView({ token }: { token: string }) {
                   </div>
                 ))
               ) : (
-                <div className="text-[#c8c1b5]">还没有观众评论。</div>
+                <div className="text-[#c8c1b5]">还没有观众留言。</div>
               )}
             </div>
           </div>
