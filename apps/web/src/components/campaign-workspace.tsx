@@ -31,6 +31,18 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
   const [roomPassword, setRoomPassword] = useState("stormgate");
   const [spectatorCommentEnabled, setSpectatorCommentEnabled] = useState(true);
 
+  function describeVisibility(value: "PRIVATE" | "LINK" | "PUBLIC") {
+    if (value === "PRIVATE") {
+      return "仅成员可见";
+    }
+
+    if (value === "PUBLIC") {
+      return "公开可见";
+    }
+
+    return "持链接可见";
+  }
+
   const refreshWorkspace = useCallback(async (authToken = token) => {
     setStatus("同步战役、角色和房间");
     try {
@@ -40,7 +52,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
         await apiFetch<Character[]>(`/campaigns/${campaignId}/characters`, {}, authToken),
       );
       setRooms(await apiFetch<Room[]>(`/rooms?campaignId=${campaignId}`, {}, authToken));
-      setStatus("战役工作台已同步");
+      setStatus("内容已更新");
     } catch (error) {
       setStatus(`战役同步失败: ${error instanceof Error ? error.message : "未知错误"}`);
     }
@@ -83,7 +95,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
   }
 
   async function generatePortrait(characterId: string) {
-    setStatus("生成 portrait 中");
+    setStatus("生成角色肖像中");
     await apiFetch(
       `/characters/${characterId}/portrait`,
       {
@@ -95,7 +107,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
       token,
     );
     await refreshWorkspace();
-    setStatus("portrait 已生成");
+    setStatus("角色肖像已生成");
   }
 
   async function createRoom() {
@@ -124,9 +136,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-8 lg:px-10">
       <section className="flex items-start justify-between gap-6 border border-[var(--panel-border)] bg-[var(--panel)] p-8">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-[var(--accent-2)]">
-            AITRPG / Campaign Studio
-          </p>
+          <p className="text-sm uppercase tracking-[0.3em] text-[var(--accent-2)]">AITRPG</p>
           <h1 className="mt-4 font-[family-name:var(--font-display)] text-5xl leading-none">
             {campaign?.title ?? "战役加载中"}
           </h1>
@@ -145,7 +155,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
       <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <div className="border border-[var(--panel-border)] bg-[rgba(15,18,23,0.88)] p-6">
           <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
-            Character Forge
+            角色创建
           </h2>
           <div className="mt-5 space-y-4 text-sm">
             <input
@@ -218,7 +228,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
                         />
                       ) : (
                         <div className="flex h-[144px] items-center justify-center text-xs text-[#c8c1b5]">
-                          无 portrait
+                          暂无肖像
                         </div>
                       )}
                     </div>
@@ -231,7 +241,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
                         className="border border-[var(--accent-2)] px-4 py-2 text-sm text-[var(--accent-2)]"
                         onClick={() => void generatePortrait(character.id)}
                       >
-                        {character.portrait ? "重生成 portrait" : "生成 portrait"}
+                        {character.portrait ? "重新生成肖像" : "生成肖像"}
                       </button>
                     </div>
                   </div>
@@ -246,7 +256,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
 
           <div className="border border-[var(--panel-border)] bg-[rgba(15,18,23,0.88)] p-6">
             <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
-              Live Session Rooms
+              房间
             </h2>
             <div className="mt-5 grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
               <div className="space-y-4 text-sm">
@@ -282,7 +292,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
                     checked={spectatorCommentEnabled}
                     onChange={(event) => setSpectatorCommentEnabled(event.target.checked)}
                   />
-                  开启观众评论流
+                  允许观众留言
                 </label>
                 <button
                   className="w-full bg-[var(--accent-2)] px-4 py-3 text-left text-black"
@@ -303,7 +313,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
                       <div className="flex items-center justify-between gap-4">
                         <div className="text-lg text-[#ece5d8]">{room.title}</div>
                         <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent-2)]">
-                          {room.visibility}
+                          {describeVisibility(room.visibility)}
                         </div>
                       </div>
                       <div className="mt-2 text-sm leading-7 text-[#c8c1b5]">
