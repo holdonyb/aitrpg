@@ -89,6 +89,8 @@ The repository currently contains the first implementation slice:
 - persisted character portrait generation with local SVG portrait assets
 - API foundation for ledger and media jobs
 - web foundation for key product surfaces
+- operator console at `/admin` for health telemetry and independent review reports with object-level resolution flow
+- operator review runs with automatic report write-back and target-aware room/artifact/system snapshots
 
 ## Email Delivery
 

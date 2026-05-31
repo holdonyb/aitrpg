@@ -38,17 +38,46 @@ Implemented:
   - character list/create and room mutation APIs require the owning DM
   - file-store fallback is limited to store connectivity/timeouts, not Prisma constraint errors
   - API package scripts generate Prisma client before test/build
+- schema validation errors now return structured `400` responses instead of leaking as `500`
 - browser smoke verified for:
   - `/` system bootstrap, email-code login, campaign creation
   - `/campaigns/[campaignId]` character creation, portrait generation, room creation
   - `/rooms/[roomId]` room workspace load, DM input panel, afterplay controls, share panel
+- local API chain verified end-to-end for:
+  - campaign creation
+  - character creation + portrait
+  - room creation + ledger event
+  - Co-DM suggestions
+  - room share + password access
+  - spectator comment
+  - afterplay illustration + artifact share
+- browser QA verified on local production web (`next start`):
+  - direct entry to `/campaigns/[campaignId]` now restores token-backed workspace data after refresh
+  - `/rooms/[roomId]` loads ledger and afterplay state
+  - room share link generation renders correctly
+  - spectator page password unlock and comment posting both work in-browser
+  - artifact share page loads shared metadata and prompt content
+- operator surface implemented:
+  - `/api/system/health` returns runtime checks, totals, and media job counts
+  - `/api/system/review-reports` supports authenticated create/list
+  - `/admin` shows health data and persisted review report history
+- review reports now support:
+  - `SYSTEM / ROOM / ARTIFACT` targets
+  - persisted `OPEN / RESOLVED`回流状态
+  - backend resolve action and admin-side resolution button
+- review runs now support:
+  - authenticated create/list APIs
+  - automatic write-back into linked review reports
+  - target-aware room/artifact/system snapshots
+  - room page one-click launch into independent review flow
+  - admin-side auto refresh while tasks are queued/running
+  - linked report anchors and room-page deep links for target inspection
 
 Next:
 
 - persist story ledger and afterplay/media job flows with the same Prisma path
 - connect portrait and afterplay jobs to stored assets
-- add admin health surfaces and independent review workflow
-- continue browser QA deeper into room events, spectator view, and artifact sharing
+- continue browser QA deeper into room events, spectator view, artifact sharing, and review-run regression loops
 
 ## Risks
 

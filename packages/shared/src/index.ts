@@ -53,6 +53,15 @@ export const mediaJobStatusSchema = z.enum([
   "failed",
   "retryable",
 ]);
+export const reviewReportStatusSchema = z.enum(["pass", "fail"]);
+export const reviewTargetTypeSchema = z.enum(["SYSTEM", "ROOM", "ARTIFACT"]);
+export const reviewResolutionStatusSchema = z.enum(["OPEN", "RESOLVED"]);
+export const reviewRunStatusSchema = z.enum([
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+]);
 
 export const campaignInputSchema = z.object({
   title: z.string().min(2).max(80),
@@ -126,6 +135,25 @@ export const emailCodeVerifySchema = z.object({
   code: z.string().length(6),
 });
 
+export const reviewReportInputSchema = z.object({
+  scope: z.string().min(2).max(80),
+  reviewerLabel: z.string().min(2).max(80),
+  status: reviewReportStatusSchema,
+  targetType: reviewTargetTypeSchema.default("SYSTEM"),
+  targetId: z.string().uuid().optional(),
+  reviewRunId: z.string().uuid().optional(),
+  summary: z.string().min(10).max(400),
+  findings: z.string().min(10).max(4000),
+});
+
+export const reviewRunInputSchema = z.object({
+  scope: z.string().min(2).max(80),
+  reviewerLabel: z.string().min(2).max(80),
+  targetType: reviewTargetTypeSchema.default("SYSTEM"),
+  targetId: z.string().uuid().optional(),
+  brief: z.string().min(10).max(400),
+});
+
 export type CampaignInput = z.infer<typeof campaignInputSchema>;
 export type CharacterInput = z.infer<typeof characterInputSchema>;
 export type RoomInput = z.infer<typeof roomInputSchema>;
@@ -138,3 +166,5 @@ export type ShareLinkInput = z.infer<typeof shareLinkInputSchema>;
 export type ShareAccessInput = z.infer<typeof shareAccessInputSchema>;
 export type SpectatorCommentInput = z.infer<typeof spectatorCommentInputSchema>;
 export type PortraitInput = z.infer<typeof portraitInputSchema>;
+export type ReviewReportInput = z.infer<typeof reviewReportInputSchema>;
+export type ReviewRunInput = z.infer<typeof reviewRunInputSchema>;

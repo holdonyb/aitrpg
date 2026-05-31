@@ -6,6 +6,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/common/configure-app';
 
 type AuthResponse = {
   token: string;
@@ -85,6 +86,42 @@ type CommentListResponse = {
   comments: Array<{ id: string }>;
 };
 
+type HealthResponse = {
+  product: string;
+  checks: {
+    database: string;
+  };
+  totals: {
+    campaigns: number;
+    reviewReports: number;
+    reviewRuns?: number;
+  };
+};
+
+type ReviewReportResponse = {
+  id: string;
+  scope: string;
+  reviewerLabel: string;
+  status: 'pass' | 'fail';
+  targetType: 'SYSTEM' | 'ROOM' | 'ARTIFACT';
+  targetId?: string;
+  resolutionStatus: 'OPEN' | 'RESOLVED';
+  summary: string;
+  findings: string;
+};
+
+type ReviewRunResponse = {
+  id: string;
+  scope: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  targetType: 'SYSTEM' | 'ROOM' | 'ARTIFACT';
+  targetId?: string | null;
+  summary?: string | null;
+  linkedReviewReportId?: string | null;
+  targetLabel?: string | null;
+  targetRoomId?: string | null;
+};
+
 describe('AITRPG API (e2e)', () => {
   let app: INestApplication;
   const snapshotPath = path.resolve(
@@ -105,7 +142,7 @@ describe('AITRPG API (e2e)', () => {
     }).compile();
 
     const nextApp = moduleFixture.createNestApplication();
-    nextApp.setGlobalPrefix('api');
+    configureApp(nextApp);
     await nextApp.init();
     return nextApp;
   }
@@ -206,6 +243,240 @@ describe('AITRPG API (e2e)', () => {
       .expect(200);
 
     expect((ledgerResponse.body as LedgerResponse).events).toHaveLength(1);
+  });
+
+  it('returns 400 when room input fails schema validation', async () => {
+    const email = 'room-validate@example.com';
+
+    const sendResponse = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email })
+      .expect(201);
+
+    const verifyResponse = await api()
+      .post('/api/auth/email/verify')
+      .send({
+        email,
+        code: (sendResponse.body as SendCodeResponse).debugCode,
+      })
+      .expect(201);
+
+    const token = (verifyResponse.body as AuthResponse).token;
+
+    const campaignResponse = await api()
+      .post('/api/campaigns')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Storm Archive',
+        pitch:
+          'A scholar party descends into a sealed archive before the floodgates fail.',
+      })
+      .expect(201);
+
+    const invalidRoomResponse = await api()
+      .post('/api/rooms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        campaignId: (campaignResponse.body as CampaignResponse).id,
+        title: 'Gate',
+        description: '太短了',
+      })
+      .expect(400);
+
+    expect(
+      (invalidRoomResponse.body as { message: string }).message,
+    ).toBe('Validation failed');
+  });
+
+  it('returns system health and persists review reports with resolve flow', async () => {
+    const email = 'ops@example.com';
+
+    const sendResponse = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email })
+      .expect(201);
+
+    const verifyResponse = await api()
+      .post('/api/auth/email/verify')
+      .send({
+        email,
+        code: (sendResponse.body as SendCodeResponse).debugCode,
+      })
+      .expect(201);
+
+    const token = (verifyResponse.body as AuthResponse).token;
+
+    const campaignResponse = await api()
+      .post('/api/campaigns')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Operator Watch',
+        pitch:
+          'A small operator run validates health telemetry and independent review write-back.',
+      })
+      .expect(201);
+
+    const roomResponse = await api()
+      .post('/api/rooms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        campaignId: (campaignResponse.body as CampaignResponse).id,
+        title: 'Review Bridge',
+        description:
+          'A short control room scene exists so the review report can attach to a concrete room.',
+      })
+      .expect(201);
+
+    const roomId = (roomResponse.body as RoomResponse).id;
+
+    const healthResponse = await api().get('/api/system/health').expect(200);
+    const healthPayload = healthResponse.body as HealthResponse;
+
+    expect(healthPayload.product).toBe('AITRPG');
+    expect(healthPayload.checks.database).toBe('file-store');
+    expect(healthPayload.totals.campaigns).toBeGreaterThanOrEqual(1);
+
+    const reviewResponse = await api()
+      .post('/api/system/review-reports')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        scope: 'operator-regression',
+        reviewerLabel: 'independent-subagent',
+        status: 'fail',
+        targetType: 'ROOM',
+        targetId: roomId,
+        summary: 'Operator review found one follow-up item.',
+        findings:
+          'The health panel loads. The next pass should add job retry triggers and richer queue diagnostics.',
+      })
+      .expect(201);
+
+    const reviewPayload = reviewResponse.body as ReviewReportResponse;
+    expect(reviewPayload.scope).toBe('operator-regression');
+    expect(reviewPayload.targetType).toBe('ROOM');
+    expect(reviewPayload.targetId).toBe(roomId);
+    expect(reviewPayload.resolutionStatus).toBe('OPEN');
+
+    const resolvedResponse = await api()
+      .post(`/api/system/review-reports/${reviewPayload.id}/resolve`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+      .expect(201);
+
+    expect(
+      (resolvedResponse.body as ReviewReportResponse).resolutionStatus,
+    ).toBe('RESOLVED');
+
+    const listResponse = await api()
+      .get('/api/system/review-reports')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const listPayload = listResponse.body as ReviewReportResponse[];
+    expect(listPayload).toHaveLength(1);
+    expect(listPayload[0]?.id).toBe(reviewPayload.id);
+    expect(listPayload[0]?.resolutionStatus).toBe('RESOLVED');
+    expect((campaignResponse.body as CampaignResponse).id).toEqual(
+      expect.any(String),
+    );
+  });
+
+  it('creates a room-scoped review run and writes its result back as a review report', async () => {
+    const email = 'review-run@example.com';
+
+    const sendResponse = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email })
+      .expect(201);
+
+    const verifyResponse = await api()
+      .post('/api/auth/email/verify')
+      .send({
+        email,
+        code: (sendResponse.body as SendCodeResponse).debugCode,
+      })
+      .expect(201);
+
+    const token = (verifyResponse.body as AuthResponse).token;
+
+    const campaignResponse = await api()
+      .post('/api/campaigns')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Review Run Room',
+        pitch:
+          'A targeted review run should inspect a concrete room surface and summarize its state.',
+      })
+      .expect(201);
+
+    const roomResponse = await api()
+      .post('/api/rooms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        campaignId: (campaignResponse.body as CampaignResponse).id,
+        title: 'Review Target Room',
+        description:
+          'This room exists so the automated review can inspect ledger, share, and afterplay readiness.',
+      })
+      .expect(201);
+
+    const roomId = (roomResponse.body as RoomResponse).id;
+
+    await api()
+      .post(`/api/rooms/${roomId}/events`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        roomId,
+        type: 'narration',
+        content: 'A review lantern is lit so the target room has a real ledger event.',
+      })
+      .expect(201);
+
+    await api()
+      .post(`/api/rooms/${roomId}/share`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ targetType: 'ROOM' })
+      .expect(201);
+
+    const runResponse = await api()
+      .post('/api/system/review-runs')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        scope: 'automated-browser-pass',
+        reviewerLabel: 'independent-subagent',
+        targetType: 'ROOM',
+        targetId: roomId,
+        brief: 'Confirm the target room exposes ledger and share state for operator review.',
+      })
+      .expect(201);
+
+    const runPayload = runResponse.body as ReviewRunResponse;
+    expect(runPayload.scope).toBe('automated-browser-pass');
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const runsResponse = await api()
+      .get('/api/system/review-runs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const runsPayload = runsResponse.body as ReviewRunResponse[];
+    expect(runsPayload[0]?.status).toBe('succeeded');
+    expect(runsPayload[0]?.targetType).toBe('ROOM');
+    expect(runsPayload[0]?.targetLabel).toBe('Review Target Room');
+    expect(runsPayload[0]?.targetRoomId).toBe(roomId);
+
+    const reportsResponse = await api()
+      .get('/api/system/review-reports')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const reportsPayload = reportsResponse.body as ReviewReportResponse[];
+    expect(reportsPayload[0]?.reviewRunId).toBe(runPayload.id);
+    expect(reportsPayload[0]?.targetType).toBe('ROOM');
+    expect(reportsPayload[0]?.summary).toContain('room "Review Target Room"');
+    expect(reportsPayload[0]?.findings).toContain('Story Ledger 事件数: 1');
+    expect(runsPayload[0]?.linkedReviewReportId).toBe(reportsPayload[0]?.id);
   });
 
   it('creates a shareable room and accepts spectator comments through a share link', async () => {

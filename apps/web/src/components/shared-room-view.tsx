@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAuthToken } from "@/lib/use-auth-token";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ??
@@ -65,13 +66,7 @@ export function SharedRoomView({ token }: { token: string }) {
   const [comments, setComments] = useState<CommentPayload["comments"]>([]);
   const [shareAccessToken, setShareAccessToken] = useState("");
   const [status, setStatus] = useState("加载观战页");
-  const [authedToken] = useState(() => {
-    if (typeof window === "undefined") {
-      return "";
-    }
-
-    return window.localStorage.getItem("aitrpg-token") ?? "";
-  });
+  const { token: authedToken, ready } = useAuthToken();
 
   useEffect(() => {
     const headers = shareAccessToken
@@ -87,7 +82,7 @@ export function SharedRoomView({ token }: { token: string }) {
   }, [shareAccessToken, token]);
 
   useEffect(() => {
-    if (!authedToken) {
+    if (!ready || !authedToken) {
       return;
     }
 
@@ -102,7 +97,7 @@ export function SharedRoomView({ token }: { token: string }) {
     )
       .then((payload: CommentPayload) => setComments(payload.comments))
       .catch(() => undefined);
-  }, [authedToken, shareAccessToken, token]);
+  }, [authedToken, ready, shareAccessToken, token]);
 
   async function unlockRoom() {
     setStatus("验证观战密码");

@@ -9,19 +9,14 @@ import {
   type Campaign,
   type SystemStatus,
 } from "@/lib/api";
+import { useAuthToken } from "@/lib/use-auth-token";
 
 export function DashboardHome() {
   const [system, setSystem] = useState<SystemStatus | null>(null);
   const [status, setStatus] = useState("等待登录");
   const [email, setEmail] = useState("dm@example.com");
   const [code, setCode] = useState("");
-  const [token, setToken] = useState(() => {
-    if (typeof window === "undefined") {
-      return "";
-    }
-
-    return window.localStorage.getItem("aitrpg-token") ?? "";
-  });
+  const { token, ready, setToken } = useAuthToken();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignTitle, setCampaignTitle] = useState("灰烬王座");
   const [campaignPitch, setCampaignPitch] = useState(
@@ -37,21 +32,23 @@ export function DashboardHome() {
   }, []);
 
   const refreshCampaigns = useCallback(async (authToken = token) => {
-    const payload = await apiFetch<Campaign[]>("/campaigns", {}, authToken);
-    setCampaigns(payload);
-    const lastCampaignId = window.localStorage.getItem("aitrpg-campaign-id");
-    if (!lastCampaignId && payload[0]) {
-      window.localStorage.setItem("aitrpg-campaign-id", payload[0].id);
+    try {
+      const payload = await apiFetch<Campaign[]>("/campaigns", {}, authToken);
+      setCampaigns(payload);
+      const lastCampaignId = window.localStorage.getItem("aitrpg-campaign-id");
+      if (!lastCampaignId && payload[0]) {
+        window.localStorage.setItem("aitrpg-campaign-id", payload[0].id);
+      }
+      setStatus(payload.length ? "已恢复战役列表" : "已登录，尚未创建战役");
+    } catch (error) {
+      setStatus(`战役恢复失败: ${error instanceof Error ? error.message : "未知错误"}`);
     }
-    setStatus(payload.length ? "已恢复战役列表" : "已登录，尚未创建战役");
   }, [token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
-
-    window.localStorage.setItem("aitrpg-token", token);
     const timer = window.setTimeout(() => {
       void refreshCampaigns(token);
     }, 0);
@@ -59,7 +56,7 @@ export function DashboardHome() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [refreshCampaigns, token]);
+  }, [ready, refreshCampaigns, token]);
 
   async function requestCode() {
     setStatus("请求验证码中");
@@ -105,7 +102,6 @@ export function DashboardHome() {
   function logout() {
     setToken("");
     setCampaigns([]);
-    window.localStorage.removeItem("aitrpg-token");
     setStatus("已退出");
   }
 
@@ -134,6 +130,11 @@ export function DashboardHome() {
             <p>鉴权: {system?.authMode ?? "加载中"}</p>
             <p>房间面: {system?.roomSurface ?? "加载中"}</p>
             <p>当前状态: {status}</p>
+            {authenticated ? (
+              <Link className="inline-block underline underline-offset-4" href="/admin">
+                进入后台
+              </Link>
+            ) : null}
           </div>
         </div>
       </section>

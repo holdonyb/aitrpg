@@ -16,6 +16,8 @@ model User {
   spectatorComments SpectatorComment[]
   shareLinks        ShareLink[]          @relation("ShareLinkCreator")
   emailCodes        EmailCodeChallenge[]
+  reviewReports     ReviewReport[]
+  reviewRuns        ReviewRun[]
   createdAt         DateTime             @default(now())
 }
 
@@ -127,4 +129,38 @@ model EmailCodeChallenge {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+model ReviewReport {
+  id            String   @id @default(uuid())
+  createdBy     String
+  creator       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  scope         String
+  reviewerLabel String
+  status        String
+  targetType    String   @default("SYSTEM")
+  targetId      String?
+  resolutionStatus String @default("OPEN")
+  summary       String
+  findings      String
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  reviewRunId   String?
+  reviewRun     ReviewRun? @relation(fields: [reviewRunId], references: [id], onDelete: SetNull)
+}
+
+model ReviewRun {
+  id            String   @id @default(uuid())
+  createdBy     String
+  creator       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  scope         String
+  reviewerLabel String
+  targetType    String   @default("SYSTEM")
+  targetId      String?
+  brief         String
+  status        String   @default("queued")
+  summary       String?
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+  reports       ReviewReport[]
 }

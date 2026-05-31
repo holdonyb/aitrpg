@@ -7,17 +7,13 @@ import {
   apiFetch,
   type LedgerResponse,
   type Room,
+  type ReviewRun,
   type ShareLinkResponse,
 } from "@/lib/api";
+import { useAuthToken } from "@/lib/use-auth-token";
 
 export function RoomWorkspace({ roomId }: { roomId: string }) {
-  const [token] = useState(() => {
-    if (typeof window === "undefined") {
-      return "";
-    }
-
-    return window.localStorage.getItem("aitrpg-token") ?? "";
-  });
+  const { token, ready } = useAuthToken();
   const [room, setRoom] = useState<Room | null>(null);
   const [ledger, setLedger] = useState<LedgerResponse | null>(null);
   const [status, setStatus] = useState("加载房间");
@@ -27,16 +23,21 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [shareLink, setShareLink] = useState("");
   const [artifactLinks, setArtifactLinks] = useState<Record<string, string>>({});
+  const [reviewRunLinks, setReviewRunLinks] = useState<Record<string, string>>({});
 
   const refreshRoom = useCallback(async (authToken = token) => {
     setStatus("同步房间与 Story Ledger");
-    setRoom(await apiFetch<Room>(`/rooms/${roomId}`, {}, authToken));
-    setLedger(await apiFetch<LedgerResponse>(`/rooms/${roomId}/ledger`, {}, authToken));
-    setStatus("房间已同步");
+    try {
+      setRoom(await apiFetch<Room>(`/rooms/${roomId}`, {}, authToken));
+      setLedger(await apiFetch<LedgerResponse>(`/rooms/${roomId}/ledger`, {}, authToken));
+      setStatus("房间已同步");
+    } catch (error) {
+      setStatus(`房间同步失败: ${error instanceof Error ? error.message : "未知错误"}`);
+    }
   }, [roomId, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
 
@@ -48,7 +49,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [refreshRoom, roomId, token]);
+  }, [ready, refreshRoom, roomId, token]);
 
   async function postEvent() {
     setStatus("写入剧情事件中");
@@ -126,6 +127,35 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       [artifactId]: `${window.location.origin}/share/artifacts/${response.token}`,
     }));
     setStatus("产物分享链接已生成");
+  }
+
+  async function createReviewRunForTarget(
+    targetType: "ROOM" | "ARTIFACT",
+    targetId: string,
+    brief: string,
+  ) {
+    setStatus("触发独立审查任务中");
+    const response = await apiFetch<ReviewRun>(
+      "/system/review-runs",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          scope: targetType === "ROOM" ? "room-regression" : "artifact-regression",
+          reviewerLabel: "operator-triggered-review",
+          targetType,
+          targetId,
+          brief,
+        }),
+      },
+      token,
+    );
+    setReviewRunLinks((current) => ({
+      ...current,
+      [targetId]: `/admin?targetType=${targetType}&targetId=${targetId}&scope=${encodeURIComponent(
+        targetType === "ROOM" ? "room-regression" : "artifact-regression",
+      )}&brief=${encodeURIComponent(brief)}`,
+    }));
+    setStatus(`独立审查任务已创建: ${response.status}`);
   }
 
   return (
@@ -209,12 +239,26 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                     <div className="mt-2 text-[#ece5d8]">{job.title}</div>
                     {job.status === "succeeded" ? (
                       <div className="mt-3 space-y-3">
-                        <button
-                          className="border border-[var(--accent-2)] px-4 py-2 text-sm text-[var(--accent-2)]"
-                          onClick={() => void createArtifactShareLink(job.id)}
-                        >
-                          分享产物
-                        </button>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            className="border border-[var(--accent-2)] px-4 py-2 text-sm text-[var(--accent-2)]"
+                            onClick={() => void createArtifactShareLink(job.id)}
+                          >
+                            分享产物
+                          </button>
+                          <button
+                            className="border border-white/15 px-4 py-2 text-sm text-[#d8d3c7]"
+                            onClick={() =>
+                              void createReviewRunForTarget(
+                                "ARTIFACT",
+                                job.id,
+                                `复查产物 ${job.title} 的分享状态、完成状态和房间绑定。`,
+                              )
+                            }
+                          >
+                            独立审查产物
+                          </button>
+                        </div>
                         {artifactLinks[job.id] ? (
                           <a
                             className="block break-all text-sm text-[#d8d3c7] underline underline-offset-4"
@@ -224,6 +268,14 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                           >
                             {artifactLinks[job.id]}
                           </a>
+                        ) : null}
+                        {reviewRunLinks[job.id] ? (
+                          <Link
+                            className="block text-sm text-[#c8c1b5] underline underline-offset-4"
+                            href={reviewRunLinks[job.id]}
+                          >
+                            查看该产物的审查任务
+                          </Link>
                         ) : null}
                       </div>
                     ) : null}
@@ -277,12 +329,26 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
                 观战分享
               </h2>
-              <button
-                className="border border-[var(--accent-2)] px-4 py-2 text-sm text-[var(--accent-2)]"
-                onClick={() => void createShareLink()}
-              >
-                生成链接
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  className="border border-[var(--accent-2)] px-4 py-2 text-sm text-[var(--accent-2)]"
+                  onClick={() => void createShareLink()}
+                >
+                  生成链接
+                </button>
+                <button
+                  className="border border-white/15 px-4 py-2 text-sm text-[#d8d3c7]"
+                  onClick={() =>
+                    void createReviewRunForTarget(
+                      "ROOM",
+                      roomId,
+                      "复查房间页面、Story Ledger、分享链路和观众流入口是否可用。",
+                    )
+                  }
+                >
+                  独立审查房间
+                </button>
+              </div>
             </div>
             {shareLink ? (
               <a
@@ -298,6 +364,14 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                 还没有生成观战链接。
               </div>
             )}
+            {reviewRunLinks[roomId] ? (
+              <Link
+                className="mt-4 block text-sm text-[#c8c1b5] underline underline-offset-4"
+                href={reviewRunLinks[roomId]}
+              >
+                查看该房间的审查任务
+              </Link>
+            ) : null}
           </div>
 
           <div className="border border-[var(--panel-border)] bg-[rgba(15,18,23,0.88)] p-6">

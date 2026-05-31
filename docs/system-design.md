@@ -32,6 +32,7 @@ flowchart LR
 - `ledger`: normalized story events
 - `media`: jobs and assets
 - `providers`: environment-backed AI provider selection
+- `operator`: system health snapshot, persisted independent review reports, and review-run tasks linked to system, room, or artifact targets with resolution tracking
 
 ## Design Constraints
 
