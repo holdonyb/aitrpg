@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  ApiError,
   apiFetch,
   type AuthPayload,
   type Campaign,
@@ -14,6 +15,7 @@ import { useAuthToken } from "@/lib/use-auth-token";
 export function DashboardHome() {
   const [system, setSystem] = useState<SystemStatus | null>(null);
   const [status, setStatus] = useState("等待登录");
+  const [authFeedback, setAuthFeedback] = useState<string | null>(null);
   const [email, setEmail] = useState("dm@example.com");
   const [code, setCode] = useState("");
   const { token, ready, setToken } = useAuthToken();
@@ -22,8 +24,26 @@ export function DashboardHome() {
   const [campaignPitch, setCampaignPitch] = useState(
     "一支边境冒险队必须阻止古王冠在战乱中复苏。",
   );
+  const [sendCooldownSeconds, setSendCooldownSeconds] = useState(0);
+  const [requestingCode, setRequestingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
 
   const authenticated = useMemo(() => token.length > 0, [token]);
+
+  useEffect(() => {
+    if (sendCooldownSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setSendCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [sendCooldownSeconds]);
 
   useEffect(() => {
     void apiFetch<SystemStatus>("/system")
@@ -59,52 +79,123 @@ export function DashboardHome() {
   }, [ready, refreshCampaigns, token]);
 
   async function requestCode() {
+    setAuthFeedback(null);
     setStatus("请求验证码中");
-    const response = await apiFetch<{ debugCode: string }>(
-      "/auth/email/send-code",
-      {
-        method: "POST",
-        body: JSON.stringify({ email }),
-      },
-    );
-    if (response.debugCode) {
-      setCode(response.debugCode);
+    setRequestingCode(true);
+    try {
+      const response = await apiFetch<{ debugCode?: string }>(
+        "/auth/email/send-code",
+        {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        },
+      );
+      if (response.debugCode) {
+        setCode(response.debugCode);
+      }
+      setSendCooldownSeconds(60);
+      setStatus("验证码已发送");
+    } catch (error) {
+      const message = getAuthErrorMessage(error, "request");
+      const retryAfterSeconds =
+        error instanceof ApiError ? error.payload.retryAfterSeconds ?? 0 : 0;
+      if (retryAfterSeconds > 0) {
+        setSendCooldownSeconds(retryAfterSeconds);
+      }
+      setAuthFeedback(message);
+      setStatus(message);
+    } finally {
+      setRequestingCode(false);
     }
-    setStatus("验证码已发送");
   }
 
   async function verifyCode() {
+    setAuthFeedback(null);
     setStatus("验证登录中");
-    const response = await apiFetch<AuthPayload>("/auth/email/verify", {
-      method: "POST",
-      body: JSON.stringify({ email, code }),
-    });
-    setToken(response.token);
-    setStatus(`已登录为 ${response.user.displayName}`);
+    setVerifyingCode(true);
+    try {
+      const response = await apiFetch<AuthPayload>("/auth/email/verify", {
+        method: "POST",
+        body: JSON.stringify({ email, code }),
+      });
+      setToken(response.token);
+      setStatus(`已登录为 ${response.user.displayName}`);
+    } catch (error) {
+      const message = getAuthErrorMessage(error, "verify");
+      setAuthFeedback(message);
+      setStatus(message);
+    } finally {
+      setVerifyingCode(false);
+    }
   }
 
   async function createCampaign() {
+    setCreatingCampaign(true);
     setStatus("创建战役中");
-    const response = await apiFetch<Campaign>(
-      "/campaigns",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          title: campaignTitle,
-          pitch: campaignPitch,
-        }),
-      },
-      token,
-    );
-    window.localStorage.setItem("aitrpg-campaign-id", response.id);
-    await refreshCampaigns();
-    setStatus("战役已创建");
+    try {
+      const response = await apiFetch<Campaign>(
+        "/campaigns",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            title: campaignTitle,
+            pitch: campaignPitch,
+          }),
+        },
+        token,
+      );
+      window.localStorage.setItem("aitrpg-campaign-id", response.id);
+      await refreshCampaigns();
+      setStatus("战役已创建");
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? `创建失败：${error.message}` : "创建失败，请稍后重试",
+      );
+    } finally {
+      setCreatingCampaign(false);
+    }
   }
 
   function logout() {
     setToken("");
     setCampaigns([]);
     setStatus("已退出");
+    setAuthFeedback(null);
+    setSendCooldownSeconds(0);
+  }
+
+  function getAuthErrorMessage(error: unknown, action: "request" | "verify") {
+    if (!(error instanceof ApiError)) {
+      return action === "request"
+        ? "验证码发送失败，请稍后重试。"
+        : "登录失败，请稍后重试。";
+    }
+
+    const issueMessages = error.payload.issues?.map((issue) => issue.message) ?? [];
+    if (issueMessages.some((message) => message.toLowerCase().includes("email"))) {
+      return "请输入有效的邮箱地址。";
+    }
+
+    if (issueMessages.some((message) => message.includes("6"))) {
+      return "请输入 6 位验证码。";
+    }
+
+    if (error.payload.statusCode === 429) {
+      const retryAfterSeconds = error.payload.retryAfterSeconds ?? 60;
+      return `验证码已发送，请 ${retryAfterSeconds} 秒后再试。`;
+    }
+
+    if (error.payload.statusCode === 401) {
+      return "验证码不正确或已过期，请重新获取。";
+    }
+
+    if (error.payload.statusCode === 503) {
+      return "邮件服务暂时不可用，请稍后再试。";
+    }
+
+    return action === "request"
+      ? "验证码发送失败，请稍后重试。"
+      : "登录失败，请稍后重试。";
   }
 
   return (
@@ -151,16 +242,22 @@ export function DashboardHome() {
             </label>
             <div className="flex gap-3">
               <button
-                className="bg-[var(--accent)] px-4 py-3 text-black"
+                className="bg-[var(--accent)] px-4 py-3 text-black disabled:opacity-40"
+                disabled={requestingCode || sendCooldownSeconds > 0}
                 onClick={requestCode}
               >
-                发送验证码
+                {sendCooldownSeconds > 0
+                  ? `${sendCooldownSeconds} 秒后重试`
+                  : requestingCode
+                    ? "发送中"
+                    : "发送验证码"}
               </button>
               <button
-                className="border border-[var(--accent-2)] px-4 py-3 text-[var(--accent-2)]"
+                className="border border-[var(--accent-2)] px-4 py-3 text-[var(--accent-2)] disabled:opacity-40"
+                disabled={verifyingCode}
                 onClick={verifyCode}
               >
-                验证登录
+                {verifyingCode ? "验证中" : "验证登录"}
               </button>
               <button
                 className="border border-white/15 px-4 py-3 text-[#d8d3c7] disabled:opacity-40"
@@ -178,6 +275,11 @@ export function DashboardHome() {
                 onChange={(event) => setCode(event.target.value)}
               />
             </label>
+            {authFeedback ? (
+              <div className="border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[#ffd6d1]">
+                {authFeedback}
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -205,10 +307,10 @@ export function DashboardHome() {
               </label>
               <button
                 className="w-full bg-[var(--accent-2)] px-4 py-3 text-left text-black disabled:opacity-40"
-                disabled={!authenticated}
+                disabled={!authenticated || creatingCampaign}
                 onClick={createCampaign}
               >
-                创建战役
+                {creatingCampaign ? "创建中" : "创建战役"}
               </button>
             </div>
 

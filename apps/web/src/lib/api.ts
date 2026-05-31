@@ -5,6 +5,29 @@ export const API_BASE =
     ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api")
     : "/api";
 
+export type ApiErrorPayload = {
+  statusCode?: number;
+  message?: string | string[];
+  error?: string;
+  code?: string;
+  retryAfterSeconds?: number;
+  issues?: Array<{
+    path?: string | string[];
+    message: string;
+    code?: string;
+  }>;
+};
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly payload: ApiErrorPayload = {},
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -26,7 +49,23 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    const raw = await response.text();
+    let payload: ApiErrorPayload | undefined;
+
+    try {
+      payload = JSON.parse(raw) as ApiErrorPayload;
+    } catch {
+      payload = undefined;
+    }
+
+    const message =
+      typeof payload?.message === "string"
+        ? payload.message
+        : Array.isArray(payload?.message)
+          ? payload.message.join(" ")
+          : raw;
+
+    throw new ApiError(message || "请求失败", payload);
   }
 
   return (await response.json()) as T;

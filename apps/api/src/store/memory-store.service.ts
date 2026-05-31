@@ -14,6 +14,7 @@ type EmailCodeRecord = {
   email: string;
   code: string;
   expiresAt: number;
+  issuedAt: number;
 };
 
 type Campaign = {
@@ -171,9 +172,14 @@ export class MemoryStoreService implements OnModuleInit {
     this.emailCodes.set(email, {
       email,
       code,
+      issuedAt: Date.now(),
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
     this.persist();
+  }
+
+  getCodeRecord(email: string) {
+    return this.emailCodes.get(email);
   }
 
   verifyCode(email: string, code: string) {

@@ -1,4 +1,6 @@
 import {
+  HttpException,
+  HttpStatus,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -14,6 +16,8 @@ import { MailerService, VerificationDeliveryError } from './mailer.service';
 
 @Injectable()
 export class AuthService {
+  private readonly sendCodeCooldownMs = 60 * 1000;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -22,6 +26,8 @@ export class AuthService {
   ) {}
 
   async issueCode(email: string) {
+    await this.enforceCodeCooldown(email);
+
     const code = `${randomInt(100000, 999999)}`;
     await this.withFallback(
       async () => {
@@ -60,6 +66,48 @@ export class AuthService {
       ok: true,
       debugCode: delivery.debugCode,
     };
+  }
+
+  private async enforceCodeCooldown(email: string) {
+    const retryAfterSeconds = await this.withFallback(
+      async () => {
+        const latestChallenge = await this.prisma.emailCodeChallenge.findFirst({
+          where: { email },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        return this.getRetryAfterSeconds(latestChallenge?.createdAt);
+      },
+      () => {
+        const latestRecord = this.memoryStore.getCodeRecord(email);
+        return this.getRetryAfterSeconds(
+          latestRecord ? new Date(latestRecord.issuedAt) : undefined,
+        );
+      },
+    );
+
+    if (retryAfterSeconds > 0) {
+      throw new HttpException(
+        {
+          message: 'Verification code recently sent',
+          retryAfterSeconds,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private getRetryAfterSeconds(issuedAt?: Date) {
+    if (!issuedAt) {
+      return 0;
+    }
+
+    const elapsed = Date.now() - issuedAt.getTime();
+    if (elapsed >= this.sendCodeCooldownMs) {
+      return 0;
+    }
+
+    return Math.ceil((this.sendCodeCooldownMs - elapsed) / 1000);
   }
 
   async verifyCode(email: string, code: string) {
@@ -174,7 +222,10 @@ export class AuthService {
         }),
       ]);
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof HttpException
+      ) {
         throw error;
       }
 

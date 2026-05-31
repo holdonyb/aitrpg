@@ -186,6 +186,48 @@ describe('AITRPG API (e2e)', () => {
     expect(verifyPayload.user.email).toBe(email);
   });
 
+  it('rejects a second verification code request during the cooldown window', async () => {
+    const email = 'cooldown@example.com';
+
+    await api()
+      .post('/api/auth/email/send-code')
+      .send({ email })
+      .expect(201);
+
+    const cooldownResponse = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email })
+      .expect(429);
+
+    expect(
+      cooldownResponse.body as {
+        retryAfterSeconds: number;
+        message: string;
+      },
+    ).toMatchObject({
+      message: 'Verification code recently sent',
+    });
+    expect(cooldownResponse.body.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it('returns 401 when the verification code is wrong', async () => {
+    const email = 'wrong-code@example.com';
+
+    await api()
+      .post('/api/auth/email/send-code')
+      .send({ email })
+      .expect(201);
+
+    const wrongCodeResponse = await api()
+      .post('/api/auth/email/verify')
+      .send({ email, code: '000000' })
+      .expect(401);
+
+    expect((wrongCodeResponse.body as { message: string }).message).toBe(
+      'Invalid verification code',
+    );
+  });
+
   it('creates a campaign, room, and ledger event after login', async () => {
     const email = 'party@example.com';
 

@@ -48,4 +48,24 @@ describe('AuthService', () => {
       },
     } satisfies Partial<ServiceUnavailableException>);
   });
+
+  it('throttles repeated verification code requests within the cooldown window', async () => {
+    const service = createService({
+      sendVerificationCode: jest.fn().mockResolvedValue({
+        delivered: false,
+        debugCode: '123456',
+      }),
+    });
+
+    await expect(service.issueCode('dm@example.com')).resolves.toMatchObject({
+      ok: true,
+    });
+
+    await expect(service.issueCode('dm@example.com')).rejects.toMatchObject({
+      response: {
+        message: 'Verification code recently sent',
+      },
+      status: 429,
+    });
+  });
 });
