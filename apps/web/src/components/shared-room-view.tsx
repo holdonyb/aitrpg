@@ -86,6 +86,10 @@ export function SharedRoomView({ token }: { token: string }) {
       return;
     }
 
+    if (room?.requiresPassword && !room.accessGranted) {
+      return;
+    }
+
     apiFetch(
       `/share/rooms/${token}/comments`,
       {
@@ -97,7 +101,7 @@ export function SharedRoomView({ token }: { token: string }) {
     )
       .then((payload: CommentPayload) => setComments(payload.comments))
       .catch(() => undefined);
-  }, [authedToken, ready, shareAccessToken, token]);
+  }, [authedToken, ready, room, shareAccessToken, token]);
 
   async function unlockRoom() {
     setStatus("验证观战密码");
