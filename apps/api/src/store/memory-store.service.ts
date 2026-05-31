@@ -98,6 +98,36 @@ type SpectatorComment = {
   createdAt: Date;
 };
 
+type ReviewReport = {
+  id: string;
+  createdBy: string;
+  scope: string;
+  reviewerLabel: string;
+  status: string;
+  targetType: string;
+  targetId?: string;
+  resolutionStatus: string;
+  summary: string;
+  findings: string;
+  resolvedAt?: Date;
+  createdAt: Date;
+  reviewRunId?: string;
+};
+
+type ReviewRun = {
+  id: string;
+  createdBy: string;
+  scope: string;
+  reviewerLabel: string;
+  targetType: string;
+  targetId?: string;
+  brief: string;
+  status: string;
+  summary?: string;
+  createdAt: Date;
+  completedAt?: Date;
+};
+
 type StoreSnapshot = {
   users: User[];
   emailCodes: EmailCodeRecord[];
@@ -108,6 +138,8 @@ type StoreSnapshot = {
   mediaJobs: MediaJob[];
   shareLinks: ShareLink[];
   spectatorComments: SpectatorComment[];
+  reviewReports: ReviewReport[];
+  reviewRuns: ReviewRun[];
 };
 
 @Injectable()
@@ -123,6 +155,8 @@ export class MemoryStoreService implements OnModuleInit {
   private readonly shareLinks = new Map<string, ShareLink>();
   private readonly shareLinksByTarget = new Map<string, ShareLink>();
   private readonly spectatorComments = new Map<string, SpectatorComment[]>();
+  private readonly reviewReports = new Map<string, ReviewReport>();
+  private readonly reviewRuns = new Map<string, ReviewRun>();
   private readonly snapshotPath = path.resolve(
     process.cwd(),
     '.runtime',
@@ -369,6 +403,15 @@ export class MemoryStoreService implements OnModuleInit {
     return this.shareLinks.get(token);
   }
 
+  countShareLinksForTarget(targetType: string, targetId: string) {
+    return [...this.shareLinks.values()].filter(
+      (link) =>
+        link.targetType === targetType &&
+        link.targetId === targetId &&
+        !link.revokedAt,
+    ).length;
+  }
+
   addSpectatorComment(
     roomId: string,
     userId: string,
@@ -392,6 +435,113 @@ export class MemoryStoreService implements OnModuleInit {
 
   listSpectatorComments(roomId: string) {
     return this.spectatorComments.get(roomId) ?? [];
+  }
+
+  createReviewReport(input: Omit<ReviewReport, 'id' | 'createdAt'>) {
+    const record: ReviewReport = {
+      id: randomUUID(),
+      createdAt: new Date(),
+      ...input,
+    };
+    this.reviewReports.set(record.id, record);
+    this.persist();
+    return record;
+  }
+
+  listReviewReports() {
+    return [...this.reviewReports.values()].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    );
+  }
+
+  getLatestReviewReportForRun(reviewRunId: string) {
+    return this.listReviewReports().find((report) => report.reviewRunId === reviewRunId);
+  }
+
+  createReviewRun(input: Omit<ReviewRun, 'id' | 'createdAt'>) {
+    const record: ReviewRun = {
+      id: randomUUID(),
+      createdAt: new Date(),
+      ...input,
+    };
+    this.reviewRuns.set(record.id, record);
+    this.persist();
+    return record;
+  }
+
+  listReviewRuns() {
+    return [...this.reviewRuns.values()].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    );
+  }
+
+  getReviewRun(reviewRunId: string) {
+    return this.reviewRuns.get(reviewRunId);
+  }
+
+  updateReviewRun(
+    reviewRunId: string,
+    patch: Partial<ReviewRun>,
+  ) {
+    const current = this.reviewRuns.get(reviewRunId);
+    if (!current) {
+      return undefined;
+    }
+
+    const next = { ...current, ...patch };
+    this.reviewRuns.set(reviewRunId, next);
+    this.persist();
+    return next;
+  }
+
+  updateReviewReportResolution(
+    reviewReportId: string,
+    resolutionStatus: string,
+  ) {
+    const report = this.reviewReports.get(reviewReportId);
+    if (!report) {
+      return undefined;
+    }
+
+    const next = {
+      ...report,
+      resolutionStatus,
+      resolvedAt: resolutionStatus === 'RESOLVED' ? new Date() : undefined,
+    };
+    this.reviewReports.set(reviewReportId, next);
+    this.persist();
+    return next;
+  }
+
+  countUsers() {
+    return this.users.size;
+  }
+
+  countCampaigns() {
+    return this.campaigns.size;
+  }
+
+  countRooms() {
+    return this.rooms.size;
+  }
+
+  countStoryEvents() {
+    return [...this.events.values()].reduce((sum, items) => sum + items.length, 0);
+  }
+
+  countPortraitAssets() {
+    return [...this.characters.values()].reduce(
+      (sum, character) => sum + character.portraitAssets.length,
+      0,
+    );
+  }
+
+  countReviewReports() {
+    return this.reviewReports.size;
+  }
+
+  countReviewRuns() {
+    return this.reviewRuns.size;
   }
 
   verifyRoomPassword(room: Room, password?: string) {
@@ -484,6 +634,20 @@ export class MemoryStoreService implements OnModuleInit {
       });
       this.spectatorComments.set(item.roomId, records);
     });
+    (snapshot.reviewReports ?? []).forEach((item) => {
+      this.reviewReports.set(item.id, {
+        ...item,
+        createdAt: new Date(item.createdAt),
+        resolvedAt: item.resolvedAt ? new Date(item.resolvedAt) : undefined,
+      });
+    });
+    (snapshot.reviewRuns ?? []).forEach((item) => {
+      this.reviewRuns.set(item.id, {
+        ...item,
+        createdAt: new Date(item.createdAt),
+        completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
+      });
+    });
   }
 
   private persist() {
@@ -498,6 +662,8 @@ export class MemoryStoreService implements OnModuleInit {
       mediaJobs: [...this.mediaJobs.values()].flat(),
       shareLinks: [...this.shareLinks.values()],
       spectatorComments: [...this.spectatorComments.values()].flat(),
+      reviewReports: [...this.reviewReports.values()],
+      reviewRuns: [...this.reviewRuns.values()],
     };
     fs.writeFileSync(
       this.snapshotPath,

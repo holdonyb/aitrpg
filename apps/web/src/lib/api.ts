@@ -99,3 +99,61 @@ export type SharedArtifactPayload = {
     createdAt: string;
   };
 };
+
+export type SystemHealth = {
+  product: string;
+  generatedAt: string;
+  storeMode: string;
+  checks: {
+    api: string;
+    database: string;
+    email: string;
+    mediaWorker: string;
+  };
+  totals: {
+    users: number;
+    campaigns: number;
+    rooms: number;
+    events: number;
+    portraits: number;
+    reviewReports: number;
+    reviewRuns: number;
+  };
+  jobs: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+};
+
+export type ReviewReport = {
+  id: string;
+  createdBy: string;
+  scope: string;
+  reviewerLabel: string;
+  status: "pass" | "fail";
+  targetType: "SYSTEM" | "ROOM" | "ARTIFACT";
+  targetId?: string;
+  resolutionStatus: "OPEN" | "RESOLVED";
+  summary: string;
+  findings: string;
+  resolvedAt?: string;
+  createdAt: string;
+  reviewRunId?: string | null;
+};
+
+export type ReviewRun = {
+  id: string;
+  createdBy: string;
+  scope: string;
+  reviewerLabel: string;
+  targetType: "SYSTEM" | "ROOM" | "ARTIFACT";
+  targetId?: string | null;
+  brief: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  summary?: string | null;
+  linkedReviewReportId?: string | null;
+  targetLabel?: string | null;
+  targetRoomId?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+};

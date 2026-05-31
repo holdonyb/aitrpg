@@ -12,6 +12,7 @@ import { CampaignsService } from './campaigns/campaigns.service';
 import { CharactersController } from './characters/characters.controller';
 import { MediaJobsService } from './media-jobs/media-jobs.service';
 import { PrismaService } from './prisma/prisma.service';
+import { ReviewRunsService } from './review-runs/review-runs.service';
 import { RoomsController } from './rooms/rooms.controller';
 import { ShareController } from './rooms/share.controller';
 import { RoomsService } from './rooms/rooms.service';
@@ -37,6 +38,7 @@ import { MemoryStoreService } from './store/memory-store.service';
     MemoryStoreService,
     RoomsService,
     PrismaService,
+    ReviewRunsService,
   ],
 })
 export class AppModule {}

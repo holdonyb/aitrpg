@@ -4,15 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch, type Campaign, type Character, type Room } from "@/lib/api";
+import { useAuthToken } from "@/lib/use-auth-token";
 
 export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
-  const [token] = useState(() => {
-    if (typeof window === "undefined") {
-      return "";
-    }
-
-    return window.localStorage.getItem("aitrpg-token") ?? "";
-  });
+  const { token, ready } = useAuthToken();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -38,17 +33,21 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
 
   const refreshWorkspace = useCallback(async (authToken = token) => {
     setStatus("同步战役、角色和房间");
-    const campaigns = await apiFetch<Campaign[]>("/campaigns", {}, authToken);
-    setCampaign(campaigns.find((item) => item.id === campaignId) ?? null);
-    setCharacters(
-      await apiFetch<Character[]>(`/campaigns/${campaignId}/characters`, {}, authToken),
-    );
-    setRooms(await apiFetch<Room[]>(`/rooms?campaignId=${campaignId}`, {}, authToken));
-    setStatus("战役工作台已同步");
+    try {
+      const campaigns = await apiFetch<Campaign[]>("/campaigns", {}, authToken);
+      setCampaign(campaigns.find((item) => item.id === campaignId) ?? null);
+      setCharacters(
+        await apiFetch<Character[]>(`/campaigns/${campaignId}/characters`, {}, authToken),
+      );
+      setRooms(await apiFetch<Room[]>(`/rooms?campaignId=${campaignId}`, {}, authToken));
+      setStatus("战役工作台已同步");
+    } catch (error) {
+      setStatus(`战役同步失败: ${error instanceof Error ? error.message : "未知错误"}`);
+    }
   }, [campaignId, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
 
@@ -60,7 +59,7 @@ export function CampaignWorkspace({ campaignId }: { campaignId: string }) {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [campaignId, refreshWorkspace, token]);
+  }, [campaignId, ready, refreshWorkspace, token]);
 
   async function createCharacter() {
     setStatus("创建角色中");

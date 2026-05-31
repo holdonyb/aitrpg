@@ -78,7 +78,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@aitrpg/shared$": "<rootDir>/../../packages/shared/dist"
+      "^@aitrpg/shared$": "<rootDir>/../../../packages/shared/dist"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

@@ -33,6 +33,8 @@ Included:
 - login-gated spectator comments in a separate stream
 - structured story ledger
 - async media jobs
+- operator console with system health snapshot, object-linked review reports, and fix-resolution tracking
+- operator-triggered review runs that inspect a concrete system, room, or artifact target and write back a linked review report
 
 Excluded:
 
