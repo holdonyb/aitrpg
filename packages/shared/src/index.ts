@@ -128,11 +128,18 @@ export const portraitInputSchema = z.object({
 
 export const emailCodeRequestSchema = z.object({
   email: z.email(),
+  inviteCode: z.string().min(4).max(64).optional(),
 });
 
 export const emailCodeVerifySchema = z.object({
   email: z.email(),
   code: z.string().length(6),
+});
+
+export const inviteCodeCreateSchema = z.object({
+  code: z.string().min(4).max(64).optional(),
+  usageLimit: z.int().min(1).max(100000).default(1),
+  expiresAt: z.string().datetime().optional(),
 });
 
 export const reviewReportInputSchema = z.object({
@@ -162,6 +169,7 @@ export type StoryEventInput = z.infer<typeof storyEventInputSchema>;
 export type MediaJobInput = z.infer<typeof mediaJobInputSchema>;
 export type EmailCodeRequest = z.infer<typeof emailCodeRequestSchema>;
 export type EmailCodeVerify = z.infer<typeof emailCodeVerifySchema>;
+export type InviteCodeCreateInput = z.infer<typeof inviteCodeCreateSchema>;
 export type ShareLinkInput = z.infer<typeof shareLinkInputSchema>;
 export type ShareAccessInput = z.infer<typeof shareAccessInputSchema>;
 export type SpectatorCommentInput = z.infer<typeof spectatorCommentInputSchema>;

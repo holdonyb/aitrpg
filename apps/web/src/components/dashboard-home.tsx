@@ -17,6 +17,7 @@ export function DashboardHome() {
   const [status, setStatus] = useState("等待登录");
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
   const [email, setEmail] = useState("dm@example.com");
+  const [inviteCode, setInviteCode] = useState("");
   const [code, setCode] = useState("");
   const { token, ready, setToken } = useAuthToken();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -87,7 +88,10 @@ export function DashboardHome() {
         "/auth/email/send-code",
         {
           method: "POST",
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({
+            email,
+            inviteCode: inviteCode.trim() || undefined,
+          }),
         },
       );
       if (response.debugCode) {
@@ -189,6 +193,24 @@ export function DashboardHome() {
       return "验证码不正确或已过期，请重新获取。";
     }
 
+    if (error.payload.statusCode === 403) {
+      if (error.message.includes("required")) {
+        return "首次进入需要邀请码。";
+      }
+      if (error.message.includes("invalid")) {
+        return "邀请码无效，请检查后重试。";
+      }
+      if (error.message.includes("disabled")) {
+        return "邀请码已停用，请联系组织者。";
+      }
+      if (error.message.includes("expired")) {
+        return "邀请码已失效，请联系组织者。";
+      }
+      if (error.message.includes("exhausted")) {
+        return "邀请码已用完，请联系组织者。";
+      }
+    }
+
     if (error.payload.statusCode === 503) {
       return "邮件服务暂时不可用，请稍后再试。";
     }
@@ -239,6 +261,18 @@ export function DashboardHome() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-[#d8d3c7]">邀请码</span>
+              <input
+                className="w-full border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                placeholder="首次进入时填写"
+                value={inviteCode}
+                onChange={(event) => setInviteCode(event.target.value)}
+              />
+              <span className="mt-2 block text-xs text-[#9f988b]">
+                已经进入过 AITRPG 的邮箱可以留空。
+              </span>
             </label>
             <div className="flex gap-3">
               <button

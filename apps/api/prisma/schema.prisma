@@ -123,12 +123,25 @@ model EmailCodeChallenge {
   id        String   @id @default(uuid())
   email     String
   code      String
+  inviteCodeId String?
+  inviteCode InviteCode? @relation(fields: [inviteCodeId], references: [id], onDelete: SetNull)
   expiresAt DateTime
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+model InviteCode {
+  id          String               @id @default(uuid())
+  code        String               @unique
+  status      String               @default("active")
+  usageLimit  Int
+  usedCount   Int                  @default(0)
+  expiresAt   DateTime?
+  createdAt   DateTime             @default(now())
+  emailCodes  EmailCodeChallenge[]
 }
 
 model ReviewReport {

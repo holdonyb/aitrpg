@@ -10,6 +10,7 @@ import { randomInt } from 'crypto';
 import jwt from 'jsonwebtoken';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { InviteCodesService } from '../invite-codes/invite-codes.service';
 import { isPrimaryStoreUnavailable } from '../store/fallback';
 import { MemoryStoreService } from '../store/memory-store.service';
 import { MailerService, VerificationDeliveryError } from './mailer.service';
@@ -23,9 +24,15 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly memoryStore: MemoryStoreService,
     private readonly mailerService: MailerService,
+    private readonly inviteCodesService: InviteCodesService,
   ) {}
 
-  async issueCode(email: string) {
+  async issueCode(email: string, inviteCode?: string) {
+    const { inviteCodeId } = await this.inviteCodesService.prepareForEmailCode(
+      email,
+      inviteCode,
+    );
+
     await this.enforceCodeCooldown(email);
 
     const code = `${randomInt(100000, 999999)}`;
@@ -39,12 +46,13 @@ export class AuthService {
           data: {
             email,
             code,
+            inviteCodeId,
             expiresAt: new Date(Date.now() + 10 * 60 * 1000),
           },
         });
       },
       () => {
-        this.memoryStore.saveCode(email, code);
+        this.memoryStore.saveCode(email, code, inviteCodeId);
       },
     );
 
@@ -111,7 +119,14 @@ export class AuthService {
   }
 
   async verifyCode(email: string, code: string) {
+    const localRecord = this.memoryStore.getCodeRecord(email);
     if (this.memoryStore.verifyCode(email, code)) {
+      const existingUser = this.memoryStore.findUserByEmail(email);
+      if (!existingUser) {
+        await this.inviteCodesService.consumeInviteForNewUser(
+          localRecord?.inviteCodeId,
+        );
+      }
       const user = this.memoryStore.findOrCreateUser(email);
       const secret =
         this.configService.get<string>('JWT_SECRET') || 'aitrpg-dev-secret';
@@ -140,14 +155,22 @@ export class AuthService {
           throw new UnauthorizedException('Invalid verification code');
         }
 
+        const existingUser = await this.prisma.user.findUnique({
+          where: { email },
+        });
+
+        if (!existingUser) {
+          await this.inviteCodesService.consumeInviteForNewUser(
+            challenge.inviteCodeId ?? undefined,
+          );
+        }
+
         await this.prisma.emailCodeChallenge.deleteMany({
           where: { email },
         });
 
         return (
-          (await this.prisma.user.findUnique({
-            where: { email },
-          })) ??
+          existingUser ??
           (await this.prisma.user.create({
             data: {
               email,
@@ -156,9 +179,17 @@ export class AuthService {
           }))
         );
       },
-      () => {
+      async () => {
+        const record = this.memoryStore.getCodeRecord(email);
         if (!this.memoryStore.verifyCode(email, code)) {
           throw new UnauthorizedException('Invalid verification code');
+        }
+
+        const existingUser = this.memoryStore.findUserByEmail(email);
+        if (!existingUser) {
+          await this.inviteCodesService.consumeInviteForNewUser(
+            record?.inviteCodeId,
+          );
         }
 
         return this.memoryStore.findOrCreateUser(email);

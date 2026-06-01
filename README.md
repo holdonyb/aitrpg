@@ -99,6 +99,7 @@ The login flow supports two modes:
 - `EMAIL_DELIVERY_MODE=debug`: the API returns `debugCode` for local development
 - `EMAIL_DELIVERY_MODE=smtp`: the API sends the code through SMTP and does not expose the code in the response
 - `EMAIL_DELIVERY_MODE=resend`: the API sends the code through the Resend Email API and does not expose the code in the response
+- `INVITE_CODE_SEEDS`: comma-separated bootstrap invite codes for first-time account access
 
 Recommended setup:
 
@@ -109,6 +110,8 @@ Notes:
 
 - Resend API mode requires `RESEND_API_KEY`
 - Resend also requires a valid `EMAIL_FROM` sender, usually from a verified domain
+- First-time account creation can be gated by bootstrap invite codes from `INVITE_CODE_SEEDS`
+- Existing users can continue logging in without an invite code
 - For initial testing, Resend documents `onboarding@resend.dev` as the sample sender in their Node.js guide
 - Until you verify a domain in Resend, sandbox delivery is limited to the account owner email
 - Production setup should switch `EMAIL_FROM` to a sender on your verified domain, for example `AITRPG <login@aitrpg.ifix.xin>`

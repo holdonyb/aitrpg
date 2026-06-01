@@ -2,6 +2,7 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { InviteCodesService } from '../invite-codes/invite-codes.service';
 import { MemoryStoreService } from '../store/memory-store.service';
 import { AuthService } from './auth.service';
 import { MailerService, VerificationDeliveryError } from './mailer.service';
@@ -27,6 +28,10 @@ describe('AuthService', () => {
       {} as PrismaService,
       new MemoryStoreService(configService),
       mailerService as MailerService,
+      {
+        prepareForEmailCode: jest.fn().mockResolvedValue({}),
+        consumeInviteForNewUser: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InviteCodesService,
     );
   }
 

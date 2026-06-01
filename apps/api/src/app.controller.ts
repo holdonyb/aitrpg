@@ -64,4 +64,30 @@ export class AppController {
     const user = await this.authService.authenticateHeader(authorization);
     return this.reviewRunsService.createRun(user.id, body);
   }
+
+  @Get('invite-codes')
+  async listInviteCodes(
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    await this.authService.authenticateHeader(authorization);
+    return this.appService.listInviteCodes();
+  }
+
+  @Post('invite-codes')
+  async createInviteCode(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    await this.authService.authenticateHeader(authorization);
+    return this.appService.createInviteCode(body);
+  }
+
+  @Post('invite-codes/:inviteCodeId/disable')
+  async disableInviteCode(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('inviteCodeId') inviteCodeId: string,
+  ) {
+    await this.authService.authenticateHeader(authorization);
+    return this.appService.disableInviteCode(inviteCodeId);
+  }
 }

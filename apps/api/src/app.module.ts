@@ -10,6 +10,7 @@ import { MailerService } from './auth/mailer.service';
 import { CampaignsController } from './campaigns/campaigns.controller';
 import { CampaignsService } from './campaigns/campaigns.service';
 import { CharactersController } from './characters/characters.controller';
+import { InviteCodesService } from './invite-codes/invite-codes.service';
 import { MediaJobsService } from './media-jobs/media-jobs.service';
 import { PrismaService } from './prisma/prisma.service';
 import { ReviewRunsService } from './review-runs/review-runs.service';
@@ -34,6 +35,7 @@ import { MemoryStoreService } from './store/memory-store.service';
     AuthService,
     MailerService,
     CampaignsService,
+    InviteCodesService,
     MediaJobsService,
     MemoryStoreService,
     RoomsService,

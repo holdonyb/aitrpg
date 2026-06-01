@@ -155,6 +155,7 @@ export type SystemHealth = {
     rooms: number;
     events: number;
     portraits: number;
+    inviteCodes: number;
     reviewReports: number;
     reviewRuns: number;
   };
@@ -195,4 +196,14 @@ export type ReviewRun = {
   targetRoomId?: string | null;
   createdAt: string;
   completedAt?: string | null;
+};
+
+export type InviteCode = {
+  id: string;
+  code: string;
+  status: "active" | "disabled";
+  usageLimit: number;
+  usedCount: number;
+  expiresAt?: string | null;
+  createdAt: string;
 };

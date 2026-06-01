@@ -15,6 +15,17 @@ type EmailCodeRecord = {
   code: string;
   expiresAt: number;
   issuedAt: number;
+  inviteCodeId?: string;
+};
+
+type InviteCode = {
+  id: string;
+  code: string;
+  status: 'active' | 'disabled';
+  usageLimit: number;
+  usedCount: number;
+  expiresAt?: Date;
+  createdAt: Date;
 };
 
 type Campaign = {
@@ -132,6 +143,7 @@ type ReviewRun = {
 type StoreSnapshot = {
   users: User[];
   emailCodes: EmailCodeRecord[];
+  inviteCodes: InviteCode[];
   campaigns: Campaign[];
   characters: Character[];
   rooms: Room[];
@@ -148,6 +160,8 @@ export class MemoryStoreService implements OnModuleInit {
   private readonly users = new Map<string, User>();
   private readonly userByEmail = new Map<string, User>();
   private readonly emailCodes = new Map<string, EmailCodeRecord>();
+  private readonly inviteCodes = new Map<string, InviteCode>();
+  private readonly inviteCodesByCode = new Map<string, InviteCode>();
   private readonly campaigns = new Map<string, Campaign>();
   private readonly characters = new Map<string, Character>();
   private readonly rooms = new Map<string, Room>();
@@ -168,18 +182,98 @@ export class MemoryStoreService implements OnModuleInit {
     this.load();
   }
 
-  saveCode(email: string, code: string) {
+  saveCode(email: string, code: string, inviteCodeId?: string) {
     this.emailCodes.set(email, {
       email,
       code,
       issuedAt: Date.now(),
       expiresAt: Date.now() + 10 * 60 * 1000,
+      inviteCodeId,
     });
     this.persist();
   }
 
   getCodeRecord(email: string) {
     return this.emailCodes.get(email);
+  }
+
+  createInviteCode(input: {
+    code: string;
+    usageLimit: number;
+    expiresAt?: Date;
+  }) {
+    const record: InviteCode = {
+      id: randomUUID(),
+      code: input.code,
+      status: 'active',
+      usageLimit: input.usageLimit,
+      usedCount: 0,
+      expiresAt: input.expiresAt,
+      createdAt: new Date(),
+    };
+    this.inviteCodes.set(record.id, record);
+    this.inviteCodesByCode.set(record.code, record);
+    this.persist();
+    return record;
+  }
+
+  upsertSeedInviteCode(code: string, usageLimit = 1) {
+    const existing = this.inviteCodesByCode.get(code);
+    if (existing) {
+      return existing;
+    }
+
+    return this.createInviteCode({ code, usageLimit });
+  }
+
+  listInviteCodes() {
+    return [...this.inviteCodes.values()].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    );
+  }
+
+  getInviteCodeByCode(code: string) {
+    return this.inviteCodesByCode.get(code);
+  }
+
+  getInviteCodeById(inviteCodeId: string) {
+    return this.inviteCodes.get(inviteCodeId);
+  }
+
+  incrementInviteCodeUsage(inviteCodeId: string) {
+    const current = this.inviteCodes.get(inviteCodeId);
+    if (!current) {
+      return undefined;
+    }
+
+    const next = {
+      ...current,
+      usedCount: current.usedCount + 1,
+    };
+    this.inviteCodes.set(inviteCodeId, next);
+    this.inviteCodesByCode.set(next.code, next);
+    this.persist();
+    return next;
+  }
+
+  disableInviteCode(inviteCodeId: string) {
+    const current = this.inviteCodes.get(inviteCodeId);
+    if (!current) {
+      return undefined;
+    }
+
+    const next = {
+      ...current,
+      status: 'disabled' as const,
+    };
+    this.inviteCodes.set(inviteCodeId, next);
+    this.inviteCodesByCode.set(next.code, next);
+    this.persist();
+    return next;
+  }
+
+  findUserByEmail(email: string) {
+    return this.userByEmail.get(email);
   }
 
   verifyCode(email: string, code: string) {
@@ -583,6 +677,15 @@ export class MemoryStoreService implements OnModuleInit {
     snapshot.emailCodes.forEach((item) =>
       this.emailCodes.set(item.email, item),
     );
+    (snapshot.inviteCodes ?? []).forEach((item) => {
+      const record = {
+        ...item,
+        expiresAt: item.expiresAt ? new Date(item.expiresAt) : undefined,
+        createdAt: new Date(item.createdAt),
+      };
+      this.inviteCodes.set(record.id, record);
+      this.inviteCodesByCode.set(record.code, record);
+    });
     snapshot.campaigns.forEach((item) =>
       this.campaigns.set(item.id, {
         ...item,
@@ -661,6 +764,7 @@ export class MemoryStoreService implements OnModuleInit {
     const snapshot: StoreSnapshot = {
       users: [...this.users.values()],
       emailCodes: [...this.emailCodes.values()],
+      inviteCodes: [...this.inviteCodes.values()],
       campaigns: [...this.campaigns.values()],
       characters: [...this.characters.values()],
       rooms: [...this.rooms.values()],
