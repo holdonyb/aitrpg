@@ -20,6 +20,15 @@ type SendCodeResponse = {
   debugCode: string;
 };
 
+type InviteCodeResponse = {
+  id: string;
+  code: string;
+  status: 'active' | 'disabled';
+  usageLimit: number;
+  usedCount: number;
+  expiresAt: string | null;
+};
+
 type CampaignResponse = {
   id: string;
   title: string;
@@ -154,6 +163,8 @@ describe('AITRPG API (e2e)', () => {
   beforeEach(async () => {
     process.env.DATA_STORE_MODE = 'file';
     process.env.EMAIL_DELIVERY_MODE = 'debug';
+    process.env.INVITE_CODE_SEEDS =
+      'alpha-seed,viewer-seed,viewer-restart-seed,outsider-seed';
     delete process.env.RESEND_API_KEY;
     resetDatabase();
     app = await bootstrapApp();
@@ -170,7 +181,7 @@ describe('AITRPG API (e2e)', () => {
 
     const sendResponse = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const sendPayload = sendResponse.body as SendCodeResponse;
@@ -186,12 +197,54 @@ describe('AITRPG API (e2e)', () => {
     expect(verifyPayload.user.email).toBe(email);
   });
 
+  it('rejects a second verification code request during the cooldown window', async () => {
+    const email = 'cooldown@example.com';
+
+    await api()
+      .post('/api/auth/email/send-code')
+      .send({ email, inviteCode: 'alpha-seed' })
+      .expect(201);
+
+    const cooldownResponse = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email, inviteCode: 'alpha-seed' })
+      .expect(429);
+
+    expect(
+      cooldownResponse.body as {
+        retryAfterSeconds: number;
+        message: string;
+      },
+    ).toMatchObject({
+      message: 'Verification code recently sent',
+    });
+    expect(cooldownResponse.body.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it('returns 401 when the verification code is wrong', async () => {
+    const email = 'wrong-code@example.com';
+
+    await api()
+      .post('/api/auth/email/send-code')
+      .send({ email, inviteCode: 'alpha-seed' })
+      .expect(201);
+
+    const wrongCodeResponse = await api()
+      .post('/api/auth/email/verify')
+      .send({ email, code: '000000' })
+      .expect(401);
+
+    expect((wrongCodeResponse.body as { message: string }).message).toBe(
+      'Invalid verification code',
+    );
+  });
+
   it('creates a campaign, room, and ledger event after login', async () => {
     const email = 'party@example.com';
 
     const sendResponse = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const sendPayload = sendResponse.body as SendCodeResponse;
@@ -250,7 +303,7 @@ describe('AITRPG API (e2e)', () => {
 
     const sendResponse = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const verifyResponse = await api()
@@ -293,7 +346,7 @@ describe('AITRPG API (e2e)', () => {
 
     const sendResponse = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const verifyResponse = await api()
@@ -386,7 +439,7 @@ describe('AITRPG API (e2e)', () => {
 
     const sendResponse = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const verifyResponse = await api()
@@ -485,7 +538,7 @@ describe('AITRPG API (e2e)', () => {
 
     const dmSendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email: dmEmail })
+      .send({ email: dmEmail, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const dmSendPayload = dmSendCode.body as SendCodeResponse;
@@ -581,7 +634,7 @@ describe('AITRPG API (e2e)', () => {
 
     const viewerSendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email: viewerEmail })
+      .send({ email: viewerEmail, inviteCode: 'viewer-seed' })
       .expect(201);
 
     const viewerSendPayload = viewerSendCode.body as SendCodeResponse;
@@ -623,7 +676,7 @@ describe('AITRPG API (e2e)', () => {
 
     const dmSendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email: dmEmail })
+      .send({ email: dmEmail, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const dmVerify = await api()
@@ -683,7 +736,7 @@ describe('AITRPG API (e2e)', () => {
 
     const viewerSendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email: viewerEmail })
+      .send({ email: viewerEmail, inviteCode: 'viewer-restart-seed' })
       .expect(201);
 
     const viewerVerify = await api()
@@ -742,7 +795,7 @@ describe('AITRPG API (e2e)', () => {
 
     const sendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const verify = await api()
@@ -781,7 +834,10 @@ describe('AITRPG API (e2e)', () => {
 
     const outsiderSendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email: 'portrait-outsider@example.com' })
+      .send({
+        email: 'portrait-outsider@example.com',
+        inviteCode: 'outsider-seed',
+      })
       .expect(201);
     const outsiderVerify = await api()
       .post('/api/auth/email/verify')
@@ -862,7 +918,7 @@ describe('AITRPG API (e2e)', () => {
 
     const sendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const verify = await api()
@@ -963,7 +1019,7 @@ describe('AITRPG API (e2e)', () => {
 
     const sendCode = await api()
       .post('/api/auth/email/send-code')
-      .send({ email })
+      .send({ email, inviteCode: 'alpha-seed' })
       .expect(201);
 
     const verify = await api()
@@ -1072,6 +1128,66 @@ describe('AITRPG API (e2e)', () => {
       .expect((response) => {
         expect((response.body as LedgerResponse).events).toHaveLength(1);
       });
+  });
+
+  it('rejects new users without an invite code', async () => {
+    const response = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email: 'newcomer@example.com' })
+      .expect(403);
+
+    expect((response.body as { message: string }).message).toBe(
+      'Invite code required',
+    );
+  });
+
+  it('allows an existing user to log in again without an invite code', async () => {
+    const email = 'returning@example.com';
+
+    const firstSend = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email, inviteCode: 'alpha-seed' })
+      .expect(201);
+
+    await api()
+      .post('/api/auth/email/verify')
+      .send({ email, code: (firstSend.body as SendCodeResponse).debugCode })
+      .expect(201);
+
+    const secondSend = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email })
+      .expect(201);
+
+    expect((secondSend.body as SendCodeResponse).debugCode).toMatch(/^\d{6}$/);
+  });
+
+  it('consumes an invite code only after a first successful verification', async () => {
+    const email = 'single-use@example.com';
+
+    const firstSend = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email, inviteCode: 'alpha-seed' })
+      .expect(201);
+
+    await api()
+      .post('/api/auth/email/send-code')
+      .send({ email, inviteCode: 'alpha-seed' })
+      .expect(429);
+
+    await api()
+      .post('/api/auth/email/verify')
+      .send({ email, code: (firstSend.body as SendCodeResponse).debugCode })
+      .expect(201);
+
+    const secondUserAttempt = await api()
+      .post('/api/auth/email/send-code')
+      .send({ email: 'second-user@example.com', inviteCode: 'alpha-seed' })
+      .expect(403);
+
+    expect((secondUserAttempt.body as { message: string }).message).toBe(
+      'Invite code exhausted',
+    );
   });
 
   afterEach(async () => {

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ConfigService } from '@nestjs/config';
 import { reviewReportInputSchema } from '@aitrpg/shared';
 
+import { InviteCodesService } from './invite-codes/invite-codes.service';
 import { PrismaService } from './prisma/prisma.service';
 import { isPrimaryStoreUnavailable } from './store/fallback';
 import { MemoryStoreService } from './store/memory-store.service';
@@ -12,6 +13,7 @@ export class AppService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly memoryStore: MemoryStoreService,
+    private readonly inviteCodesService: InviteCodesService,
   ) {}
 
   getSystemStatus() {
@@ -30,20 +32,22 @@ export class AppService {
     const stats = await this.withFallback(
       async () => {
         const [
-          users,
-          campaigns,
-          rooms,
-          events,
-          portraits,
-          mediaJobs,
-          reviewReports,
-          reviewRuns,
-        ] = await Promise.all([
+        users,
+        campaigns,
+        rooms,
+        events,
+        portraits,
+        inviteCodes,
+        mediaJobs,
+        reviewReports,
+        reviewRuns,
+      ] = await Promise.all([
           this.prisma.user.count(),
           this.prisma.campaign.count(),
           this.prisma.room.count(),
           this.prisma.storyEvent.count(),
           this.prisma.portraitAsset.count(),
+          this.prisma.inviteCode.count(),
           this.prisma.mediaJob.findMany({ select: { status: true } }),
           this.prisma.reviewReport.count(),
           this.prisma.reviewRun.count(),
@@ -54,6 +58,7 @@ export class AppService {
           rooms,
           events,
           portraits,
+          inviteCodes,
           mediaJobs,
           reviewReports,
           reviewRuns,
@@ -65,6 +70,7 @@ export class AppService {
         rooms: this.memoryStore.countRooms(),
         events: this.memoryStore.countStoryEvents(),
         portraits: this.memoryStore.countPortraitAssets(),
+        inviteCodes: (await this.inviteCodesService.listInviteCodes()).length,
         mediaJobs: this.memoryStore
           .listAllMediaJobs()
           .map((job) => ({ status: job.status })),
@@ -97,6 +103,7 @@ export class AppService {
         rooms: stats.rooms,
         events: stats.events,
         portraits: stats.portraits,
+        inviteCodes: stats.inviteCodes,
         reviewReports: stats.reviewReports,
         reviewRuns: stats.reviewRuns,
       },
@@ -184,6 +191,18 @@ export class AppService {
         return this.normalizeReviewReport(report);
       },
     );
+  }
+
+  async listInviteCodes() {
+    return this.inviteCodesService.listInviteCodes();
+  }
+
+  async createInviteCode(body: unknown) {
+    return this.inviteCodesService.createInviteCode(body);
+  }
+
+  async disableInviteCode(inviteCodeId: string) {
+    return this.inviteCodesService.disableInviteCode(inviteCodeId);
   }
 
   async assertReviewTargetExists(

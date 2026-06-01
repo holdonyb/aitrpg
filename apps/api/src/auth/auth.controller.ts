@@ -10,7 +10,7 @@ export class AuthController {
   @Post('email/send-code')
   sendCode(@Body() body: unknown) {
     const input = emailCodeRequestSchema.parse(body);
-    return this.authService.issueCode(input.email);
+    return this.authService.issueCode(input.email, input.inviteCode);
   }
 
   @Post('email/verify')

@@ -72,6 +72,12 @@ Implemented:
   - room page one-click launch into independent review flow
   - admin-side auto refresh while tasks are queued/running
   - linked report anchors and room-page deep links for target inspection
+- invite-only onboarding now supports:
+  - invite-code gating before verification-code send for first-time users
+  - existing-user login without invite re-entry
+  - invite consumption only after first successful verification
+  - seed invite codes via `INVITE_CODE_SEEDS`
+  - operator invite-code create/list/disable controls in `/admin`
 
 Next:
 
@@ -84,6 +90,7 @@ Next:
 - provider-specific image/video behavior may vary by configured model
 - email delivery and object storage need environment-specific production credentials
 - video generation is the most likely place to require provider-specific follow-up
+- production onboarding now depends on setting `INVITE_CODE_SEEDS` or creating invite codes from an existing operator account
 
 ## Next Validation
 

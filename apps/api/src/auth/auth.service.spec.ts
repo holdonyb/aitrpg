@@ -2,6 +2,7 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { InviteCodesService } from '../invite-codes/invite-codes.service';
 import { MemoryStoreService } from '../store/memory-store.service';
 import { AuthService } from './auth.service';
 import { MailerService, VerificationDeliveryError } from './mailer.service';
@@ -27,6 +28,10 @@ describe('AuthService', () => {
       {} as PrismaService,
       new MemoryStoreService(configService),
       mailerService as MailerService,
+      {
+        prepareForEmailCode: jest.fn().mockResolvedValue({}),
+        consumeInviteForNewUser: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InviteCodesService,
     );
   }
 
@@ -47,5 +52,25 @@ describe('AuthService', () => {
         code: 'resend_sandbox_restricted',
       },
     } satisfies Partial<ServiceUnavailableException>);
+  });
+
+  it('throttles repeated verification code requests within the cooldown window', async () => {
+    const service = createService({
+      sendVerificationCode: jest.fn().mockResolvedValue({
+        delivered: false,
+        debugCode: '123456',
+      }),
+    });
+
+    await expect(service.issueCode('dm@example.com')).resolves.toMatchObject({
+      ok: true,
+    });
+
+    await expect(service.issueCode('dm@example.com')).rejects.toMatchObject({
+      response: {
+        message: 'Verification code recently sent',
+      },
+      status: 429,
+    });
   });
 });

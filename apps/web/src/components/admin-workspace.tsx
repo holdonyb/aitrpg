@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   apiFetch,
+  type InviteCode,
   type ReviewReport,
   type ReviewRun,
   type SystemHealth,
@@ -30,6 +31,7 @@ export function AdminWorkspace({
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [runs, setRuns] = useState<ReviewRun[]>([]);
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [status, setStatus] = useState("加载后台状态");
   const [scope, setScope] = useState(initialScope ?? "browser-regression");
   const [reviewerLabel, setReviewerLabel] = useState(
@@ -47,18 +49,22 @@ export function AdminWorkspace({
   const [runBrief, setRunBrief] = useState(
     initialBrief ?? "独立检查当前目标页面是否可进入、核心数据是否加载、分享链路是否仍然可用。",
   );
+  const [newInviteCode, setNewInviteCode] = useState("");
+  const [newInviteUsageLimit, setNewInviteUsageLimit] = useState("1");
 
   const refreshAdmin = useCallback(async (authToken = token) => {
     setStatus("同步后台健康面板");
     try {
-      const [nextHealth, nextReports, nextRuns] = await Promise.all([
+      const [nextHealth, nextReports, nextRuns, nextInviteCodes] = await Promise.all([
         apiFetch<SystemHealth>("/system/health"),
         apiFetch<ReviewReport[]>("/system/review-reports", {}, authToken),
         apiFetch<ReviewRun[]>("/system/review-runs", {}, authToken),
+        apiFetch<InviteCode[]>("/system/invite-codes", {}, authToken),
       ]);
       setHealth(nextHealth);
       setReports(nextReports);
       setRuns(nextRuns);
+      setInviteCodes(nextInviteCodes);
       setStatus("后台面板已同步");
     } catch (error) {
       setStatus(`后台同步失败: ${error instanceof Error ? error.message : "未知错误"}`);
@@ -146,6 +152,36 @@ export function AdminWorkspace({
     setStatus(`独立审查任务已创建: ${createdRun.id}`);
   }
 
+  async function createInviteCode() {
+    setStatus("创建邀请码");
+    await apiFetch(
+      "/system/invite-codes",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          code: newInviteCode.trim() || undefined,
+          usageLimit: Number(newInviteUsageLimit) || 1,
+        }),
+      },
+      token,
+    );
+    setNewInviteCode("");
+    setNewInviteUsageLimit("1");
+    await refreshAdmin();
+    setStatus("邀请码已创建");
+  }
+
+  async function disableInviteCode(inviteCodeId: string) {
+    setStatus("停用邀请码");
+    await apiFetch(
+      `/system/invite-codes/${inviteCodeId}/disable`,
+      { method: "POST", body: JSON.stringify({}) },
+      token,
+    );
+    await refreshAdmin();
+    setStatus("邀请码已停用");
+  }
+
   function getTargetHref(run: ReviewRun) {
     if (run.targetType === "ROOM" && run.targetRoomId) {
       return `/rooms/${run.targetRoomId}`;
@@ -207,6 +243,7 @@ export function AdminWorkspace({
               <div className="border border-white/8 bg-black/10 px-4 py-3">房间: {health?.totals.rooms ?? 0}</div>
               <div className="border border-white/8 bg-black/10 px-4 py-3">事件: {health?.totals.events ?? 0}</div>
               <div className="border border-white/8 bg-black/10 px-4 py-3">角色肖像: {health?.totals.portraits ?? 0}</div>
+              <div className="border border-white/8 bg-black/10 px-4 py-3">邀请码: {health?.totals.inviteCodes ?? 0}</div>
               <div className="border border-white/8 bg-black/10 px-4 py-3">审查报告: {health?.totals.reviewReports ?? 0}</div>
               <div className="border border-white/8 bg-black/10 px-4 py-3">审查任务: {health?.totals.reviewRuns ?? 0}</div>
               <div className="border border-white/8 bg-black/10 px-4 py-3">媒体任务: {health?.jobs.total ?? 0}</div>
@@ -215,6 +252,60 @@ export function AdminWorkspace({
         </div>
 
         <div className="space-y-6">
+          <div className="border border-[var(--panel-border)] bg-[var(--panel)] p-6">
+            <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
+              邀请码
+            </h2>
+            <div className="mt-5 space-y-4 text-sm">
+              <input
+                className="w-full border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                placeholder="留空则自动生成"
+                value={newInviteCode}
+                onChange={(event) => setNewInviteCode(event.target.value)}
+              />
+              <input
+                className="w-full border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                inputMode="numeric"
+                value={newInviteUsageLimit}
+                onChange={(event) => setNewInviteUsageLimit(event.target.value)}
+              />
+              <button
+                className="w-full bg-[var(--accent)] px-4 py-3 text-left text-black disabled:opacity-40"
+                disabled={!token}
+                onClick={() => void createInviteCode()}
+              >
+                创建邀请码
+              </button>
+            </div>
+            <div className="mt-5 space-y-3">
+              {inviteCodes.length ? (
+                inviteCodes.map((item) => (
+                  <div key={item.id} className="border border-white/8 bg-black/10 px-4 py-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent-2)]">
+                      {item.status} / {item.code}
+                    </div>
+                    <div className="mt-2 text-sm text-[#d8d3c7]">
+                      已使用 {item.usedCount} / {item.usageLimit}
+                      {item.expiresAt ? ` / 到期 ${new Date(item.expiresAt).toLocaleString()}` : ""}
+                    </div>
+                    {item.status === "active" ? (
+                      <button
+                        className="mt-3 border border-[var(--accent-2)] px-4 py-2 text-sm text-[var(--accent-2)]"
+                        onClick={() => void disableInviteCode(item.id)}
+                      >
+                        停用
+                      </button>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <div className="border border-white/8 bg-black/10 px-4 py-4 text-sm text-[#c8c1b5]">
+                  还没有邀请码。
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="border border-[var(--panel-border)] bg-[var(--panel)] p-6">
             <h2 className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent)]">
               Review Run
